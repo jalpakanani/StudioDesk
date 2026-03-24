@@ -1,13 +1,60 @@
+:root {
+  --bg-base: #f4f2fb;
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface-solid: #ffffff;
+  --text: #14121f;
+  --muted: #6b6578;
+  --line: rgba(99, 91, 255, 0.12);
+  --accent: #5b4ae8;
+  --accent-hot: #c94bdb;
+  --accent-soft: rgba(91, 74, 232, 0.12);
+  --warn: #c2410c;
+  --ok: #0d8f4f;
+  --shadow-sm: 0 1px 2px rgba(20, 18, 31, 0.05);
+  --shadow-md: 0 8px 24px rgba(20, 18, 31, 0.08);
+  --shadow-lg: 0 20px 50px rgba(91, 74, 232, 0.12);
+  --shadow-glow: 0 8px 32px rgba(91, 74, 232, 0.35);
+  --radius: 16px;
+  --radius-sm: 12px;
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-base);
+  color: var(--text);
+}
+
+h1,
+h2,
+h3,
+.panel-title,
+.stat-value,
+.welcome-title,
+.brand-mark {
+  font-family: var(--font-display);
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

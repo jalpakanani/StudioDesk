@@ -35,20 +35,30 @@ export default function BackupBar() {
     e.target.value = '';
   }
 
+  const syncErrorBanner = cloudSync && syncError && (
+    <div className="sync-error-banner" role="alert">
+      <strong>Cloud sync problem:</strong> {syncError}. Open Firebase → Firestore → Rules and publish the rules from{' '}
+      <code className="sync-error-code">firebase/firestore.rules</code> in this project. If this device uses a
+      <strong> hosted website</strong>, add the same <code className="sync-error-code">REACT_APP_FIREBASE_*</code> keys in
+      the host (Vercel/Netlify env) and rebuild—otherwise this device stays offline-only.
+    </div>
+  );
+
+  if (cloudSync) {
+    if (!syncError) return null;
+    return (
+      <footer className="backup-bar backup-bar--sync-error-only">
+        {syncErrorBanner}
+      </footer>
+    );
+  }
+
   return (
     <footer className="backup-bar">
-      {cloudSync && syncError ? (
-        <div className="sync-error-banner" role="alert">
-          <strong>Cloud sync problem:</strong> {syncError}. Open Firebase → Firestore → Rules and publish the rules
-          from <code className="sync-error-code">firebase/firestore.rules</code> in this project. If this device uses a
-          <strong> hosted website</strong>, add the same <code className="sync-error-code">REACT_APP_FIREBASE_*</code>{' '}
-          keys in the host (Vercel/Netlify env) and rebuild—otherwise this device stays offline-only.
-        </div>
-      ) : null}
+      {syncErrorBanner}
       <span className="muted small">
-        {cloudSync
-          ? 'Your desk syncs to your account (Firebase). Same login on phone + laptop = same data when cloud works.'
-          : 'Data is stored in this browser only (localStorage)—not shared across devices. Add .env.local + login for cloud sync.'}
+        Data is stored in this browser only (localStorage)—not shared across devices. Add .env.local + login for cloud
+        sync.
       </span>
       <div className="backup-actions">
         <button type="button" className="btn small" onClick={download}>

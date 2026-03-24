@@ -6,6 +6,8 @@
   color: var(--text);
   position: relative;
   overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 .app-loading {
@@ -19,13 +21,32 @@
 
 .app-bg {
   position: fixed;
-  inset: 0;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
   z-index: 0;
   pointer-events: none;
+  box-sizing: border-box;
   background:
-    radial-gradient(ellipse 100% 80% at 10% -20%, rgba(91, 74, 232, 0.28), transparent 55%),
-    radial-gradient(ellipse 70% 50% at 95% 10%, rgba(201, 75, 219, 0.18), transparent 50%),
-    radial-gradient(ellipse 60% 45% at 50% 110%, rgba(251, 191, 36, 0.12), transparent 45%),
+    radial-gradient(
+      ellipse 100% 80% at 10% -20%,
+      rgba(91, 74, 232, 0.28),
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 70% 50% at 95% 10%,
+      rgba(201, 75, 219, 0.18),
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse 60% 45% at 50% 110%,
+      rgba(251, 191, 36, 0.12),
+      transparent 45%
+    ),
     var(--bg-base);
 }
 
@@ -50,8 +71,11 @@
 }
 
 .header-inner {
-  max-width: 1120px;
+  max-width: var(--layout-max, 100rem);
+  width: 100%;
+  min-width: 0;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .header-top {
@@ -96,7 +120,9 @@
   background: linear-gradient(145deg, var(--accent), var(--accent-hot));
   box-shadow: var(--shadow-glow);
   letter-spacing: -0.03em;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .brand-mark:hover {
@@ -122,6 +148,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .tab {
@@ -174,8 +202,9 @@
 
 .app-main {
   flex: 1;
-  padding: 1.25rem 1rem 2rem;
-  max-width: 1120px;
+  min-width: 0;
+  padding: 1.25rem clamp(0.75rem, 2vw, 1.25rem) 2rem;
+  max-width: var(--layout-max, 100rem);
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
@@ -250,12 +279,15 @@
 
 .panel {
   position: relative;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* ——— Quick actions ——— */
 .quick-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
   gap: 0.65rem;
   margin-bottom: 1.25rem;
 }
@@ -299,7 +331,11 @@
   display: grid;
   place-items: center;
   font-size: 1.35rem;
-  background: linear-gradient(145deg, var(--accent-soft), rgba(201, 75, 219, 0.1));
+  background: linear-gradient(
+    145deg,
+    var(--accent-soft),
+    rgba(201, 75, 219, 0.1)
+  );
   flex-shrink: 0;
 }
 
@@ -328,7 +364,11 @@
   margin-bottom: 1.25rem;
   overflow: hidden;
   border: 1px solid var(--line);
-  background: linear-gradient(135deg, rgba(91, 74, 232, 0.08), rgba(201, 75, 219, 0.06));
+  background: linear-gradient(
+    135deg,
+    rgba(91, 74, 232, 0.08),
+    rgba(201, 75, 219, 0.06)
+  );
   box-shadow: var(--shadow-md);
 }
 
@@ -362,7 +402,7 @@
 /* ——— Stat tiles ——— */
 .stats-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
   gap: 0.65rem;
   margin-bottom: 1.35rem;
 }
@@ -558,17 +598,29 @@
   padding: 1.25rem 1rem;
   margin: 0.15rem 0 0;
   border-radius: 14px;
-  background: linear-gradient(165deg, rgba(91, 74, 232, 0.06), rgba(255, 255, 255, 0.5));
+  background: linear-gradient(
+    165deg,
+    rgba(91, 74, 232, 0.06),
+    rgba(255, 255, 255, 0.5)
+  );
   border: 1px dashed rgba(91, 74, 232, 0.18);
 }
 
 .dash-empty--visits {
-  background: linear-gradient(165deg, rgba(251, 191, 36, 0.1), rgba(255, 255, 255, 0.55));
+  background: linear-gradient(
+    165deg,
+    rgba(251, 191, 36, 0.1),
+    rgba(255, 255, 255, 0.55)
+  );
   border-color: rgba(251, 191, 36, 0.28);
 }
 
 .dash-empty--settle {
-  background: linear-gradient(165deg, rgba(13, 143, 79, 0.08), rgba(255, 255, 255, 0.5));
+  background: linear-gradient(
+    165deg,
+    rgba(13, 143, 79, 0.08),
+    rgba(255, 255, 255, 0.5)
+  );
   border-color: rgba(13, 143, 79, 0.2);
 }
 
@@ -709,7 +761,11 @@
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--accent);
-  background: linear-gradient(135deg, rgba(91, 74, 232, 0.14), rgba(124, 58, 237, 0.1));
+  background: linear-gradient(
+    135deg,
+    rgba(91, 74, 232, 0.14),
+    rgba(124, 58, 237, 0.1)
+  );
   border: 1px solid rgba(91, 74, 232, 0.22);
 }
 
@@ -749,7 +805,11 @@
   display: inline-block;
   padding: 0.32rem 0.75rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(91, 74, 232, 0.14), rgba(201, 75, 219, 0.1));
+  background: linear-gradient(
+    135deg,
+    rgba(91, 74, 232, 0.14),
+    rgba(201, 75, 219, 0.1)
+  );
   border: 1px solid rgba(91, 74, 232, 0.18);
   font-weight: 700;
   font-size: 0.82rem;
@@ -891,6 +951,8 @@
   gap: 0.55rem;
   align-items: flex-end;
   margin-bottom: 1rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .form-row.wrap {
@@ -900,6 +962,30 @@
 .form-row.tight {
   align-items: center;
   margin-bottom: 0.5rem;
+}
+
+.form-row input,
+.form-row select {
+  flex: 1 1 6.5rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-row input,
+  .form-row select {
+    flex: none;
+    width: 100%;
+  }
+
+  .form-row > .btn {
+    width: 100%;
+  }
 }
 
 .form-row input,
@@ -942,7 +1028,8 @@
   display: grid;
   gap: 0.75rem;
   margin-bottom: 1.25rem;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  /* Min track ~15.5rem so typical phones get one column (two × 180px was crushing Match key + amount). */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr));
 }
 
 .form-grid.tight {
@@ -958,6 +1045,22 @@
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  min-width: 0;
+}
+
+@media (max-width: 520px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid input,
+  .form-grid select,
+  .form-grid textarea {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
 }
 
 .form-grid label.full {
@@ -984,6 +1087,7 @@
 
 /* ——— Glass form panel ——— */
 .glass-panel {
+  min-width: 0;
   padding: 1.1rem 1.15rem;
   border-radius: var(--radius);
   border: 1px solid var(--line);
@@ -992,6 +1096,7 @@
   -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--shadow-md);
   margin-bottom: 1.15rem;
+  box-sizing: border-box;
 }
 
 .glass-panel-title {
@@ -1063,7 +1168,12 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.25) 50%, transparent 60%);
+  background: linear-gradient(
+    105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.25) 50%,
+    transparent 60%
+  );
   transform: translateX(-100%);
   transition: transform 0.6s ease;
 }
@@ -1125,6 +1235,9 @@
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
 }
@@ -1148,6 +1261,13 @@
   justify-content: space-between;
   gap: 0.75rem;
   align-items: flex-start;
+  min-width: 0;
+}
+
+.table-row > div:first-child {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
 }
 
 .row-actions {
@@ -1161,12 +1281,33 @@
   flex-wrap: wrap;
   gap: 0.45rem;
   width: 100%;
+  max-width: 100%;
   align-items: center;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .inline-edit input {
-  flex: 1;
-  min-width: 120px;
+  flex: 1 1 7rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .inline-edit {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inline-edit input {
+    flex: none;
+    width: 100%;
+  }
+
+  .inline-edit .btn {
+    align-self: flex-start;
+    width: auto;
+  }
 }
 
 /* ——— Orders split ——— */
@@ -1225,7 +1366,11 @@
 
 .pick.active {
   border-color: var(--accent);
-  background: linear-gradient(135deg, rgba(91, 74, 232, 0.08), rgba(201, 75, 219, 0.05));
+  background: linear-gradient(
+    135deg,
+    rgba(91, 74, 232, 0.08),
+    rgba(201, 75, 219, 0.05)
+  );
   box-shadow: 0 0 0 2px rgba(91, 74, 232, 0.2);
 }
 
@@ -1264,7 +1409,11 @@
   width: 72px;
   height: 72px;
   border-radius: 20px;
-  background: linear-gradient(145deg, var(--accent-soft), rgba(201, 75, 219, 0.1));
+  background: linear-gradient(
+    145deg,
+    var(--accent-soft),
+    rgba(201, 75, 219, 0.1)
+  );
   display: grid;
   place-items: center;
   font-size: 2rem;
@@ -1299,7 +1448,11 @@
   flex-wrap: wrap;
   gap: 0.85rem 1.5rem;
   padding: 0.85rem 1rem;
-  background: linear-gradient(135deg, rgba(91, 74, 232, 0.07), rgba(201, 75, 219, 0.05));
+  background: linear-gradient(
+    135deg,
+    rgba(91, 74, 232, 0.07),
+    rgba(201, 75, 219, 0.05)
+  );
   border-radius: var(--radius-sm);
   margin: 0.85rem 0 1rem;
   font-size: 0.9rem;
@@ -1358,7 +1511,7 @@
 
 .mini-table li {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
   gap: 0.5rem;
   align-items: center;
   padding: 0.45rem 0;
@@ -1530,20 +1683,30 @@ label.inline input {
   color: inherit;
 }
 
-/* ——— My exposing ——— */
+/* ——— My Exposing ——— */
 .visit-list {
   list-style: none;
   margin: 0.5rem 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 1rem;
+}
+
+@media (min-width: 960px) {
+  .visit-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: start;
+  }
 }
 
 .visit-card {
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 1rem 1.1rem;
+  padding: 1rem 1rem 1.05rem;
   background: var(--surface);
   box-shadow: var(--shadow-sm);
   transition:
@@ -1558,59 +1721,101 @@ label.inline input {
 
 .visit-card-top {
   display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  justify-content: space-between;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 0.85rem;
+  align-items: stretch;
+}
+
+.visit-card-meta {
+  min-width: 0;
 }
 
 .visit-when {
-  font-size: 1.05rem;
-  margin-bottom: 0.25rem;
+  font-size: 1.02rem;
+  margin-bottom: 0.2rem;
 }
 
 .visit-host {
   font-weight: 700;
-  font-size: 1.02rem;
+  font-size: 1rem;
 }
 
 .visit-notes {
-  margin-top: 0.45rem;
-  font-size: 0.9rem;
+  margin-top: 0.4rem;
+  font-size: 0.88rem;
   color: var(--muted);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .visit-money {
-  min-width: 160px;
-  padding: 0.65rem 0.75rem;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, rgba(91, 74, 232, 0.07), rgba(201, 75, 219, 0.05));
-  border: 1px solid var(--line);
+  min-width: 0;
+  width: 100%;
 }
 
-.visit-money-row {
+.visit-money--tiles {
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.visit-money-combine-note {
+  margin: 0 0 0.5rem;
+  line-height: 1.35;
+}
+
+.visit-money-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 6.75rem), 1fr));
+  gap: 0.45rem;
+}
+
+.visit-money-tile {
   display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  font-size: 0.88rem;
-  padding: 0.2rem 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset;
 }
 
-.visit-due {
-  margin-top: 0.35rem;
-  padding-top: 0.45rem;
-  border-top: 1px dashed var(--line);
+.visit-money-tile-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  line-height: 1.2;
 }
 
-.visit-money-studio {
-  margin-top: 0.35rem;
-  padding-top: 0.45rem;
-  border-top: 1px dashed var(--line);
+.visit-money-tile-value {
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
-.visit-money-net {
-  padding-bottom: 0.15rem;
+.visit-money-tile--due.is-warn {
+  border-color: rgba(194, 65, 12, 0.35);
+  background: rgba(194, 65, 12, 0.06);
+}
+
+.visit-money-tile--net.is-warn {
+  border-color: rgba(194, 65, 12, 0.4);
+  background: rgba(194, 65, 12, 0.07);
+}
+
+.visit-money-tile--net.is-owe {
+  border-color: rgba(196, 58, 58, 0.35);
+  background: rgba(196, 58, 58, 0.06);
+}
+
+.visit-money-tile--net.is-even {
+  border-color: rgba(13, 143, 79, 0.35);
+  background: rgba(13, 143, 79, 0.06);
 }
 
 .visit-net-owe {
@@ -1640,39 +1845,48 @@ label.inline input {
 /* ——— Login (Firebase) ——— */
 /* Full-height login: avoid flex:1 + min-height:0 collapsing the card above the fold */
 .app-shell--login {
-  display: block;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
+  min-height: -webkit-fill-available;
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .app-shell--login > .login-screen {
-  flex: none;
-  min-height: inherit;
+  flex: 1;
+  min-height: 0;
 }
 
 .login-screen {
   position: relative;
   z-index: 2;
   isolation: isolate;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem 1.25rem 2rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  align-content: center;
+  padding: max(1.25rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1.5rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
-  min-height: 100vh;
-  min-height: 100dvh;
   width: 100%;
+  min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .login-card {
   width: 100%;
-  max-width: 420px;
-  flex-shrink: 0;
-  margin: auto;
-  padding: 2rem 1.75rem 1.75rem;
+  max-width: min(26.25rem, 100%);
+  min-width: 0;
+  margin: 0;
+  padding: 2rem 1.5rem 1.75rem;
   border-radius: 22px;
   background: #fff;
   background: linear-gradient(165deg, #ffffff 0%, #faf8ff 100%);
@@ -1681,6 +1895,19 @@ label.inline input {
     0 4px 24px rgba(45, 35, 90, 0.08),
     0 24px 48px rgba(91, 74, 232, 0.1),
     inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: 1.65rem 1.15rem 1.5rem;
+    border-radius: 18px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+
+  .login-logo {
+    box-shadow: 0 2px 10px rgba(91, 74, 232, 0.25);
+  }
 }
 
 .login-header {
@@ -1688,6 +1915,7 @@ label.inline input {
   align-items: flex-start;
   gap: 1rem;
   margin-bottom: 1.5rem;
+  min-width: 0;
 }
 
 .login-logo {
@@ -1717,6 +1945,7 @@ label.inline input {
   letter-spacing: -0.035em;
   line-height: 1.15;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 .login-subtitle {
@@ -1724,6 +1953,7 @@ label.inline input {
   font-size: 0.9rem;
   line-height: 1.45;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .login-seg {
@@ -1767,6 +1997,13 @@ label.inline input {
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.login-form .login-input,
+.login-form .login-submit {
+  max-width: 100%;
 }
 
 .login-field {
@@ -1809,12 +2046,14 @@ label.inline input {
 .login-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 4px var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 .login-password-row {
   position: relative;
   display: block;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .login-input--password {
@@ -1863,6 +2102,8 @@ label.inline input {
   color: #9a3412;
   background: rgba(254, 215, 170, 0.45);
   border: 1px solid rgba(234, 88, 12, 0.25);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .login-submit {
@@ -1881,6 +2122,7 @@ label.inline input {
 
 .sync-error-banner {
   width: 100%;
+  max-width: 100%;
   flex-basis: 100%;
   margin-bottom: 0.5rem;
   padding: 0.65rem 0.75rem;
@@ -1890,6 +2132,9 @@ label.inline input {
   color: #7a1e12;
   background: rgba(255, 87, 34, 0.12);
   border: 1px solid rgba(180, 35, 24, 0.35);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  box-sizing: border-box;
 }
 
 .sync-error-code {
@@ -1897,12 +2142,14 @@ label.inline input {
   padding: 0.08rem 0.3rem;
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.06);
+  word-break: break-all;
 }
 
 /* ——— Footer ——— */
 .backup-bar {
-  padding: 0.85rem 1rem 1.35rem;
-  max-width: 1120px;
+  min-width: 0;
+  padding: 0.85rem clamp(0.75rem, 2vw, 1.25rem) 1.35rem;
+  max-width: var(--layout-max, 100rem);
   width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
@@ -1924,4 +2171,110 @@ label.inline input {
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.backup-bar > .muted {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.backup-bar--sync-error-only {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.backup-bar--sync-error-only .sync-error-banner {
+  margin-bottom: 0;
+  flex-basis: auto;
+}
+
+@media (max-width: 640px) {
+  .backup-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .backup-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .backup-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Mobile: lock the window — scroll only inside main (or login pane). Stops sideways page scroll. */
+@media (max-width: 768px) {
+  .app-shell {
+    min-height: 0;
+    min-width: 0;
+    height: 100%;
+    max-height: 100dvh;
+    max-height: -webkit-fill-available;
+    overflow: hidden;
+  }
+
+  .app-header {
+    position: relative;
+    top: auto;
+    flex-shrink: 0;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-main {
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    max-width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: none;
+    overscroll-behavior-y: contain;
+  }
+
+  .backup-bar {
+    flex-shrink: 0;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-loading {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .app-shell--login {
+    height: 100%;
+    max-height: 100dvh;
+    max-height: -webkit-fill-available;
+    overflow: hidden;
+  }
+
+  /* Negative horizontal margins extend past the scroll pane and can widen the page on iOS. */
+  .settlement-table-wrap {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .stack-list-item {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .expose-item {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .panel {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
 }

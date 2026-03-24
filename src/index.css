@@ -18,12 +18,20 @@
   --radius-sm: 12px;
   --font-display: 'Outfit', system-ui, sans-serif;
   --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+  /* Use 100% of parent — avoids 100vw + scrollbar horizontal overflow on mobile */
+  --layout-max: min(100rem, 100%);
 }
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+html {
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
 }
 
 body {
@@ -33,6 +41,52 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: var(--bg-base);
   color: var(--text);
+  overflow-x: hidden;
+  width: 100%;
+  max-width: 100%;
+}
+
+#root {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Mobile: no window scroll — only inner panes scroll (fixes sideways rubber-band + double scroll).
+   body position:fixed is the reliable iOS/Safari pattern so the document cannot grow wider than the viewport. */
+@media (max-width: 768px) {
+  html {
+    height: 100%;
+    height: 100dvh;
+    overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  body {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: pan-y pinch-zoom;
+  }
+
+  #root {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
 }
 
 h1,

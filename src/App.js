@@ -13,7 +13,7 @@ const TABS = [
   { id: 'dash', label: 'Dashboard', icon: '◇' },
   { id: 'clients', label: 'Clients', icon: '◎' },
   { id: 'orders', label: 'Orders', icon: '▤' },
-  { id: 'field', label: 'My exposing', icon: '⌖' },
+  { id: 'field', label: 'My Exposing', icon: '⌖' },
 ];
 
 function Shell() {
@@ -44,7 +44,7 @@ function Shell() {
               </span>
               <div>
                 <h1>My Studio Desk</h1>
-                <p className="tagline">Orders &amp; payments · my exposing &amp; collections</p>
+                <p className="tagline">Orders &amp; payments · My Exposing &amp; collections</p>
               </div>
             </div>
             {auth.firebaseEnabled && auth.user ? (

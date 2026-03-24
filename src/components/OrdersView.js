@@ -197,7 +197,7 @@ export default function OrdersView() {
                 Pick a job on the left to edit the quote and client payments.
               </p>
               <button type="button" className="btn primary btn-sm shine" onClick={() => setTab('field')}>
-                Outside shoots → My exposing
+                Outside shoots → My Exposing
               </button>
             </div>
           ) : (
@@ -461,8 +461,8 @@ function ExposureGuestsSection({
       <h4>Who is coming to your studio for this Order</h4>
       <p className="muted small" style={{ margin: '0 0 0.65rem' }}>
         Add everyone who will be at <strong>your place</strong> for this job. When <em>you</em> go to someone
-        else&apos;s location, use the <strong>My exposing</strong> tab instead. If you owe them money for the
-        exposure, enter it under <strong>Pay them</strong>. Use the same <strong>Match key</strong> on my exposing
+        else&apos;s location, use the <strong>My Exposing</strong> tab instead. If you owe them money for the
+        exposure, enter it under <strong>Pay them</strong>. Use the same <strong>Match key</strong> on My Exposing
         (or the same spelling) so the dashboard can net what you collect minus what you pay.
       </p>
       <form className="form-grid tight" onSubmit={submitGuest}>
@@ -487,7 +487,7 @@ function ExposureGuestsSection({
         <label>
           Match key
           <input
-            placeholder="e.g. sandip — same on my exposing"
+            placeholder="e.g. sandip — same on My Exposing"
             value={gPartyKey}
             onChange={(e) => setGPartyKey(e.target.value)}
           />

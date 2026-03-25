@@ -1,0 +1,132 @@
+import { ActivityIndicator, Platform, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { StudioProvider, useStudio } from './src/context/StudioContext';
+import { isFirebaseConfigured } from './src/firebase/init';
+import LoginScreen from './src/screens/LoginScreen';
+import MainTabs from './src/navigation/MainTabs';
+import { useReminderNotificationsMobile } from './src/hooks/useReminderNotificationsMobile';
+import { colors } from './src/theme';
+
+function ReminderNotificationsBridge() {
+  const { orders, fieldVisits } = useStudio();
+  useReminderNotificationsMobile(orders, fieldVisits ?? []);
+  return null;
+}
+
+const navTheme = {
+  ...DefaultTheme,
+  dark: false,
+  colors: {
+    ...DefaultTheme.colors,
+    background: colors.bg,
+    card: colors.tabBarBg,
+    text: colors.text,
+    border: colors.border,
+    primary: colors.primary,
+    notification: colors.warn,
+  },
+};
+
+function ConfigMissing() {
+  return (
+    <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}>
+      <Text style={styles.title}>Configure Firebase</Text>
+      <Text style={styles.body}>
+        Copy <Text style={styles.mono}>.env.example</Text> to <Text style={styles.mono}>.env</Text> in the{' '}
+        <Text style={styles.mono}>mobileApp</Text> folder and set{' '}
+        <Text style={styles.mono}>EXPO_PUBLIC_FIREBASE_*</Text> (same values as the web app&apos;s{' '}
+        <Text style={styles.mono}>REACT_APP_FIREBASE_*</Text>). Then restart Metro (
+        <Text style={styles.mono}>npm start</Text>).
+      </Text>
+    </SafeAreaView>
+  );
+}
+
+function SyncGate({ children }) {
+  const { studioReady, syncError } = useStudio();
+  if (!studioReady) {
+    return (
+      <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.syncText}>Syncing your desk…</Text>
+      </SafeAreaView>
+    );
+  }
+  return (
+    <View style={styles.flex}>
+      {syncError ? (
+        <View style={styles.syncBanner}>
+          <Text style={styles.syncBannerText}>{syncError}</Text>
+        </View>
+      ) : null}
+      <ReminderNotificationsBridge />
+      {children}
+    </View>
+  );
+}
+
+function Root() {
+  const auth = useAuth();
+
+  if (!isFirebaseConfigured()) {
+    return <ConfigMissing />;
+  }
+
+  if (auth.loading) {
+    return (
+      <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  if (!auth.user) {
+    return <LoginScreen />;
+  }
+
+  return (
+    <StudioProvider useCloud syncUserId={auth.user.uid}>
+      <SyncGate>
+        <MainTabs />
+      </SyncGate>
+    </StudioProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
+      <NavigationContainer theme={navTheme}>
+        <AuthProvider>
+          <Root />
+        </AuthProvider>
+      </NavigationContainer>
+    </SafeAreaProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.bg },
+  center: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  title: { fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 12 },
+  body: { fontSize: 15, color: colors.muted, textAlign: 'center', lineHeight: 22 },
+  mono: { fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }), color: colors.text },
+  syncText: { marginTop: 16, color: colors.muted, fontSize: 15 },
+  syncBanner: {
+    backgroundColor: colors.syncErrorBg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.syncErrorBorder,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  syncBannerText: { color: colors.syncErrorText, fontSize: 13, textAlign: 'center', lineHeight: 18 },
+});

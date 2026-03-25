@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useStudio } from '../context/StudioContext';
-import { orderEventRange } from '../utils/dateRange';
+import { coerceDateFieldToISO, formatISODateDisplay, orderEventRange, toISODateOr } from '../utils/dateRange';
 import { formatINR, sumPayments } from '../utils/money';
 import { colors, radius } from '../theme';
 
@@ -114,25 +114,38 @@ function OrderMetaForm({ order, updateOrder }) {
   const er0 = orderEventRange(order);
   const [title, setTitle] = useState(order.title);
   const [totalAmount, setTotalAmount] = useState(String(order.totalAmount ?? ''));
-  const [orderDate, setOrderDate] = useState(order.orderDate || '');
-  const [eventDateFrom, setEventDateFrom] = useState(order.eventDateFrom || er0.from || '');
+  const [orderDate, setOrderDate] = useState(() => formatISODateDisplay(order.orderDate || ''));
+  const [eventDateFrom, setEventDateFrom] = useState(() =>
+    formatISODateDisplay(order.eventDateFrom || er0.from || ''),
+  );
   const [eventDateTo, setEventDateTo] = useState(() => {
     const from = order.eventDateFrom || er0.from || '';
     const to = order.eventDateTo || er0.to || '';
     if (from && to === from) return '';
-    return to;
+    return formatISODateDisplay(to);
   });
   const [notes, setNotes] = useState(order.notes || '');
 
+  useEffect(() => {
+    const r = orderEventRange(order);
+    const from = order.eventDateFrom || r.from || '';
+    const to = order.eventDateTo || r.to || '';
+    setOrderDate(formatISODateDisplay(order.orderDate || ''));
+    setEventDateFrom(formatISODateDisplay(from));
+    setEventDateTo(from && to === from ? '' : formatISODateDisplay(to));
+  }, [order.id, order.orderDate, order.eventDateFrom, order.eventDateTo]);
+
   function saveMeta() {
-    let evFrom = eventDateFrom.trim().slice(0, 10);
-    let evTo = eventDateTo.trim().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    const fallbackOrder = coerceDateFieldToISO(order.orderDate) || today;
+    let evFrom = toISODateOr(eventDateFrom, '');
+    let evTo = toISODateOr(eventDateTo, '');
     if (evFrom && !evTo) evTo = evFrom;
     if (evFrom && evTo && evTo < evFrom) evTo = evFrom;
     updateOrder(order.id, {
       title: title.trim(),
       totalAmount: Number(totalAmount) || 0,
-      orderDate,
+      orderDate: toISODateOr(orderDate, fallbackOrder),
       eventDateFrom: evFrom,
       eventDateTo: evTo,
       notes: notes.trim(),
@@ -153,14 +166,20 @@ function OrderMetaForm({ order, updateOrder }) {
       />
 
       <Text style={styles.labelCaps}>Order date</Text>
-      <TextInput style={styles.input} value={orderDate} onChangeText={setOrderDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.muted} />
+      <TextInput
+        style={styles.input}
+        value={orderDate}
+        onChangeText={setOrderDate}
+        placeholder="DD/MM/YYYY"
+        placeholderTextColor={colors.muted}
+      />
 
       <Text style={styles.labelCaps}>Event from</Text>
       <TextInput
         style={styles.input}
         value={eventDateFrom}
         onChangeText={setEventDateFrom}
-        placeholder="YYYY-MM-DD"
+        placeholder="DD/MM/YYYY"
         placeholderTextColor={colors.muted}
       />
 
@@ -169,7 +188,7 @@ function OrderMetaForm({ order, updateOrder }) {
         style={styles.input}
         value={eventDateTo}
         onChangeText={setEventDateTo}
-        placeholder="YYYY-MM-DD"
+        placeholder="DD/MM/YYYY"
         placeholderTextColor={colors.muted}
       />
 
@@ -373,14 +392,19 @@ function ExposureGuestsBlock({
 
 function ClientPaymentsBlock({ order, addClientPayment, removeClientPayment }) {
   const [payAmount, setPayAmount] = useState('');
-  const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [payDate, setPayDate] = useState(() =>
+    formatISODateDisplay(new Date().toISOString().slice(0, 10)),
+  );
   const [payNote, setPayNote] = useState('');
 
   function addPay() {
     if (!payAmount) return;
-    addClientPayment(order.id, { amount: payAmount, date: payDate, note: payNote });
+    const today = new Date().toISOString().slice(0, 10);
+    const d = toISODateOr(payDate, today);
+    addClientPayment(order.id, { amount: payAmount, date: d, note: payNote });
     setPayAmount('');
     setPayNote('');
+    setPayDate(formatISODateDisplay(today));
   }
 
   return (
@@ -398,7 +422,7 @@ function ClientPaymentsBlock({ order, addClientPayment, removeClientPayment }) {
         style={styles.input}
         value={payDate}
         onChangeText={setPayDate}
-        placeholder="YYYY-MM-DD"
+        placeholder="DD/MM/YYYY"
         placeholderTextColor={colors.muted}
       />
       <Text style={styles.labelCaps}>Note</Text>
@@ -417,7 +441,7 @@ function ClientPaymentsBlock({ order, addClientPayment, removeClientPayment }) {
         <View key={p.id} style={styles.payLine}>
           <View style={{ flex: 1 }}>
             <Text style={styles.payLineMain}>
-              {p.date} · {formatINR(p.amount)}
+              {formatISODateDisplay(p.date)} · {formatINR(p.amount)}
             </Text>
             {p.note ? <Text style={styles.guestMeta}>{p.note}</Text> : null}
           </View>

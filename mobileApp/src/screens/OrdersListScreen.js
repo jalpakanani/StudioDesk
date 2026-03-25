@@ -11,14 +11,20 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useStudio } from '../context/StudioContext';
-import { formatDateRangeEn, orderEventRange } from '../utils/dateRange';
+import {
+  coerceDateFieldToISO,
+  formatDateRangeEn,
+  formatISODateDisplay,
+  orderEventRange,
+  toISODateOr,
+} from '../utils/dateRange';
 import { formatINR, sumPayments } from '../utils/money';
 import { colors, radius } from '../theme';
 
 function orderSortKey(o) {
   const { from, to } = orderEventRange(o);
   const end = to || from;
-  const od = (o.orderDate || '').slice(0, 10);
+  const od = coerceDateFieldToISO(o.orderDate);
   return end || od || '9999-12-31';
 }
 
@@ -31,7 +37,9 @@ export default function OrdersListScreen() {
   const [newClientId, setNewClientId] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newTotal, setNewTotal] = useState('');
-  const [newOrderDate, setNewOrderDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [newOrderDate, setNewOrderDate] = useState(() =>
+    formatISODateDisplay(new Date().toISOString().slice(0, 10)),
+  );
   const [newEventFrom, setNewEventFrom] = useState('');
   const [newEventTo, setNewEventTo] = useState('');
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
@@ -47,13 +55,17 @@ export default function OrdersListScreen() {
   );
 
   function submitOrder() {
+    const today = new Date().toISOString().slice(0, 10);
+    const orderDateISO = toISODateOr(newOrderDate, today);
+    const evFrom = toISODateOr(newEventFrom, '');
+    const evToRaw = toISODateOr(newEventTo, '');
     const o = addOrder({
       clientId: newClientId,
       title: newTitle,
       totalAmount: newTotal,
-      orderDate: newOrderDate,
-      eventDateFrom: newEventFrom,
-      eventDateTo: newEventTo || newEventFrom,
+      orderDate: orderDateISO,
+      eventDateFrom: evFrom,
+      eventDateTo: evToRaw || evFrom,
     });
     if (o) {
       setNewTitle('');
@@ -71,7 +83,7 @@ export default function OrdersListScreen() {
     setNewClientId('');
     setNewTitle('');
     setNewTotal('');
-    setNewOrderDate(new Date().toISOString().slice(0, 10));
+    setNewOrderDate(formatISODateDisplay(new Date().toISOString().slice(0, 10)));
     setNewEventFrom('');
     setNewEventTo('');
   }
@@ -178,7 +190,7 @@ export default function OrdersListScreen() {
               style={styles.input}
               value={newOrderDate}
               onChangeText={setNewOrderDate}
-              placeholder="YYYY-MM-DD"
+              placeholder="DD/MM/YYYY"
               placeholderTextColor={colors.muted}
             />
 
@@ -187,7 +199,7 @@ export default function OrdersListScreen() {
               style={styles.input}
               value={newEventFrom}
               onChangeText={setNewEventFrom}
-              placeholder="YYYY-MM-DD"
+              placeholder="DD/MM/YYYY"
               placeholderTextColor={colors.muted}
             />
 

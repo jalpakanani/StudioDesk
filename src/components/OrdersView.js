@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useStudio } from '../context/StudioContext';
 import { useTab } from '../context/TabContext';
 import { formatINR, sumPayments } from '../utils/money';
-import { formatDateRangeEn, orderEventRange } from '../utils/dateRange';
+import { formatDateRangeEn, formatISODateDisplay, orderEventRange } from '../utils/dateRange';
 
 export default function OrdersView() {
   const { setTab } = useTab();
@@ -114,18 +114,20 @@ export default function OrdersView() {
             Order date
             <input
               type="date"
+              lang="en-IN"
               value={newOrderDate}
               onChange={(e) => setNewOrderDate(e.target.value)}
             />
           </label>
           <label>
             Event from
-            <input type="date" value={newEventFrom} onChange={(e) => setNewEventFrom(e.target.value)} />
+            <input type="date" lang="en-IN" value={newEventFrom} onChange={(e) => setNewEventFrom(e.target.value)} />
           </label>
           <label>
             Event to
             <input
               type="date"
+              lang="en-IN"
               value={newEventTo}
               onChange={(e) => setNewEventTo(e.target.value)}
               min={newEventFrom || undefined}
@@ -306,16 +308,17 @@ function OrderDetail({
         </label>
         <label>
           Order date
-          <input type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
+          <input type="date" lang="en-IN" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
         </label>
         <label>
           Event from
-          <input type="date" value={eventDateFrom} onChange={(e) => setEventDateFrom(e.target.value)} />
+          <input type="date" lang="en-IN" value={eventDateFrom} onChange={(e) => setEventDateFrom(e.target.value)} />
         </label>
         <label>
           Event to
           <input
             type="date"
+            lang="en-IN"
             value={eventDateTo}
             onChange={(e) => setEventDateTo(e.target.value)}
             min={eventDateFrom || undefined}
@@ -362,7 +365,7 @@ function OrderDetail({
             onChange={(e) => setPayAmount(e.target.value)}
             required
           />
-          <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+          <input type="date" lang="en-IN" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
           <input placeholder="Note" value={payNote} onChange={(e) => setPayNote(e.target.value)} />
           <button type="submit" className="btn primary">
             Add
@@ -371,7 +374,7 @@ function OrderDetail({
         <ul className="mini-table">
           {(order.clientPayments || []).map((p) => (
             <li key={p.id}>
-              <span>{p.date}</span>
+              <span>{formatISODateDisplay(p.date)}</span>
               <span>{formatINR(p.amount)}</span>
               <span className="muted">{p.note}</span>
               <button

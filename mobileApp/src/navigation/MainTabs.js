@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Platform, StyleSheet, Text } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DashboardScreen from '../screens/DashboardScreen';
 import ClientsScreen from '../screens/ClientsScreen';
 import OrdersStack from './OrdersStack';
@@ -9,6 +10,10 @@ import { colors } from '../theme';
 const Tab = createBottomTabNavigator();
 
 export default function MainTabs() {
+  const insets = useSafeAreaInsets();
+  const tabBarBottomPad =
+    Platform.OS === 'android' ? Math.max(insets.bottom, 20) : insets.bottom;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -17,6 +22,7 @@ export default function MainTabs() {
           backgroundColor: colors.tabBarBg,
           borderTopColor: colors.border,
           borderTopWidth: StyleSheet.hairlineWidth,
+          paddingBottom: tabBarBottomPad,
           ...Platform.select({
             ios: {
               shadowColor: '#14121f',

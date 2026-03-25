@@ -1,7 +1,7 @@
 import {useMemo, useState} from 'react'
 import {useStudio} from '../context/StudioContext'
 import {formatINR, sumPayments} from '../utils/money'
-import {fieldVisitRange, formatDateRangeEn} from '../utils/dateRange'
+import {fieldVisitRange, formatDateRangeEn, formatISODateDisplay} from '../utils/dateRange'
 import {groupedFieldVisitCardStats} from '../utils/settlement'
 
 export default function FieldVisitsView() {
@@ -158,6 +158,7 @@ export default function FieldVisitsView() {
             From date *
             <input
               type="date"
+              lang="en-IN"
               value={dateFrom}
               onChange={e => setDateFrom(e.target.value)}
               required
@@ -167,6 +168,7 @@ export default function FieldVisitsView() {
             To date
             <input
               type="date"
+              lang="en-IN"
               value={dateTo}
               onChange={e => setDateTo(e.target.value)}
               min={dateFrom || undefined}
@@ -275,6 +277,7 @@ export default function FieldVisitsView() {
                       From date *
                       <input
                         type="date"
+                        lang="en-IN"
                         value={edf}
                         onChange={e => setEdf(e.target.value)}
                         required
@@ -284,6 +287,7 @@ export default function FieldVisitsView() {
                       To date
                       <input
                         type="date"
+                        lang="en-IN"
                         value={edt}
                         onChange={e => setEdt(e.target.value)}
                         min={edf || undefined}
@@ -506,7 +510,7 @@ function VisitCollections({
           onChange={e => setAmt(e.target.value)}
           required
         />
-        <input type="date" value={dt} onChange={e => setDt(e.target.value)} />
+        <input type="date" lang="en-IN" value={dt} onChange={e => setDt(e.target.value)} />
         <input
           placeholder="Note"
           value={nt}
@@ -520,7 +524,7 @@ function VisitCollections({
         <ul className="mini-table">
           {(collections || []).map(p => (
             <li key={p.id}>
-              <span>{p.date}</span>
+              <span>{formatISODateDisplay(p.date)}</span>
               <span>{formatINR(p.amount)}</span>
               <span className="muted">{p.note}</span>
               <button

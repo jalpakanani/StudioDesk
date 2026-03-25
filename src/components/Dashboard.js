@@ -3,6 +3,7 @@ import {useStudio} from '../context/StudioContext'
 import {useTab} from '../context/TabContext'
 import {formatINR, sumPayments} from '../utils/money'
 import {
+  coerceDateFieldToISO,
   fieldVisitRange,
   formatDateRangeEn,
   orderEventRange,
@@ -30,7 +31,7 @@ function isOrderFuture(order, today) {
   const {from, to} = orderEventRange(order)
   const end = to || from
   if (end) return end >= today
-  const od = (order.orderDate || '').slice(0, 10)
+  const od = coerceDateFieldToISO(order.orderDate)
   if (od) return od >= today
   return true
 }
@@ -47,7 +48,7 @@ function isVisitFuture(v, today) {
 function futureOrderSortKey(order) {
   const {from, to} = orderEventRange(order)
   const end = to || from
-  const od = (order.orderDate || '').slice(0, 10)
+  const od = coerceDateFieldToISO(order.orderDate)
   return end || od || '9999-12-31'
 }
 
@@ -55,7 +56,7 @@ function futureOrderSortKey(order) {
 function upcomingOrderWhenLabel(order) {
   const {from, to} = orderEventRange(order)
   if (from) return formatDateRangeEn(from, to)
-  const od = (order.orderDate || '').slice(0, 10)
+  const od = coerceDateFieldToISO(order.orderDate)
   if (od) return `Booked ${formatDateRangeEn(od, od)}`
   return ''
 }

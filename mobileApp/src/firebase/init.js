@@ -1,5 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { initializeAuth, getAuth, getReactNativePersistence } from '@firebase/auth';
 import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import {
   EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -37,6 +38,7 @@ export function isFirebaseConfigured() {
 }
 
 let appSingleton = null;
+let authSingleton = null;
 
 export function getFirebaseApp() {
   const resolved = getResolvedFirebaseConfig();
@@ -49,7 +51,24 @@ export function getFirebaseApp() {
 
 export function getFirebaseAuth() {
   const app = getFirebaseApp();
-  return app ? getAuth(app) : null;
+  if (!app) return null;
+  if (authSingleton) return authSingleton;
+  try {
+    authSingleton = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+  } catch (e) {
+    if (e?.code === 'auth/already-initialized') {
+      authSingleton = getAuth(app);
+    } else {
+      throw e;
+    }
+  }
+  return authSingleton;
+}
+
+if (getResolvedFirebaseConfig()) {
+  getFirebaseAuth();
 }
 
 export function getDb() {

@@ -1,4 +1,4 @@
-import { fieldVisitRange, orderEventRange } from './dateRange';
+import { coerceDateFieldToISO, fieldVisitRange, orderEventRange } from './dateRange';
 import { sumPayments } from './money';
 
 const DAY_SLOTS_PREFIX = 'my-studio-desk-notifSlots';
@@ -80,7 +80,7 @@ export function orderEventStartsTomorrow(order, todayISO) {
   const tomorrow = addDaysISO(todayISO, 1);
   const { from } = orderEventRange(order);
   if (from) return from === tomorrow;
-  const od = String(order.orderDate || '').slice(0, 10);
+  const od = coerceDateFieldToISO(order.orderDate);
   return od === tomorrow;
 }
 
@@ -101,6 +101,6 @@ export function orderPastDueWithBalance(order, todayISO) {
   const { from, to } = orderEventRange(order);
   const end = to || from;
   if (end) return end < todayISO;
-  const od = String(order.orderDate || '').slice(0, 10);
+  const od = coerceDateFieldToISO(order.orderDate);
   return od ? od < todayISO : false;
 }

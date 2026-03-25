@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import { uid } from '../utils/money';
+import { coerceDateFieldToISO } from '../utils/dateRange';
 import { getDb, USER_DATA_COLLECTION } from '../firebase/init';
 
 const STORAGE_KEY = 'my-studio-desk-v1';
@@ -10,8 +11,8 @@ const emptyState = () => ({ clients: [], orders: [], fieldVisits: [] });
 function normalizeFieldVisits(visits) {
   if (!Array.isArray(visits)) return [];
   return visits.map((v) => {
-    const from = String(v.dateFrom || v.date || '').slice(0, 10);
-    let to = String(v.dateTo || '').slice(0, 10);
+    const from = coerceDateFieldToISO(v.dateFrom || v.date || '');
+    let to = coerceDateFieldToISO(v.dateTo || '');
     if (!to) to = from;
     if (from && to < from) to = from;
     const { date: _legacy, ...rest } = v;

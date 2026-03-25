@@ -1,12 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { getFirebaseAuth, isFirebaseConfigured } from '../firebase/init';
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
-} from 'firebase/auth';
-import { getFirebaseAuth, isFirebaseConfigured } from '../firebase/init';
+} from '@firebase/auth';
 
 const AuthContext = createContext(null);
 

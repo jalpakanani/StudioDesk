@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStudio } from '../context/StudioContext';
-import { fieldVisitRange, formatDateRangeEn } from '../utils/dateRange';
+import { fieldVisitRange, formatDateRangeEn, formatISODateDisplay, toISODateOr } from '../utils/dateRange';
 import { formatINR, sumPayments } from '../utils/money';
 import { groupedFieldVisitCardStats } from '../utils/settlement';
 import { colors, radius } from '../theme';
@@ -202,10 +202,10 @@ export default function FieldVisitsScreen() {
 }
 
 function AddVisitForm({ onClose, onCreate }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const todayISO = new Date().toISOString().slice(0, 10);
   const [hostName, setHostName] = useState('');
   const [venue, setVenue] = useState('');
-  const [dateFrom, setDateFrom] = useState(today);
+  const [dateFrom, setDateFrom] = useState(() => formatISODateDisplay(todayISO));
   const [dateTo, setDateTo] = useState('');
   const [time, setTime] = useState('');
   const [amountToCollect, setAmountToCollect] = useState('');
@@ -231,7 +231,7 @@ function AddVisitForm({ onClose, onCreate }) {
         placeholder="Area, full address, landmark…"
         placeholderTextColor={colors.muted}
       />
-      <Text style={styles.label}>From date * (YYYY-MM-DD)</Text>
+      <Text style={styles.label}>From date * (DD/MM/YYYY)</Text>
       <TextInput style={styles.input} value={dateFrom} onChangeText={setDateFrom} />
       <Text style={styles.label}>To date (optional)</Text>
       <TextInput style={styles.input} value={dateTo} onChangeText={setDateTo} placeholder="Multi-day end" placeholderTextColor={colors.muted} />
@@ -270,18 +270,20 @@ function AddVisitForm({ onClose, onCreate }) {
       />
       <TouchableOpacity
         style={styles.btnPrimary}
-        onPress={() =>
+        onPress={() => {
+          const from = toISODateOr(dateFrom, todayISO);
+          const to = toISODateOr(dateTo, '') || from;
           onCreate({
             hostName,
             venue,
-            dateFrom,
-            dateTo: dateTo || dateFrom,
+            dateFrom: from,
+            dateTo: to,
             time,
             amountToCollect,
             partyKey,
             notes,
-          })
-        }
+          });
+        }}
       >
         <Text style={styles.btnText}>Create</Text>
       </TouchableOpacity>
@@ -348,7 +350,7 @@ function VisitDetail({ visit, card, onClose, onAddCollection, onRemoveCollection
       {(visit.collections || []).map((p) => (
         <View key={p.id} style={styles.payRow}>
           <Text style={styles.rowSub}>
-            {formatINR(p.amount)} · {p.date}
+            {formatINR(p.amount)} · {formatISODateDisplay(p.date)}
             {p.note ? ` · ${p.note}` : ''}
           </Text>
           <TouchableOpacity onPress={() => onRemoveCollection(p.id)}>

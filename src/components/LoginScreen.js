@@ -34,13 +34,17 @@ function IconEyeOff({ className }) {
 }
 
 export default function LoginScreen() {
-  const { signIn, signUp, setAuthError, authError } = useAuth();
+  const { signIn, signUp, sendPasswordReset, setAuthError, authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState('signin');
   const [busy, setBusy] = useState(false);
   const [localErr, setLocalErr] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetErr, setResetErr] = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   async function submit(e) {
     e.preventDefault();
@@ -78,6 +82,40 @@ export default function LoginScreen() {
 
   const err = localErr || authError;
 
+  async function handlePasswordReset(e) {
+    e.preventDefault();
+    setResetErr('');
+    setAuthError('');
+    if (!email.trim()) {
+      setResetErr('Enter your email above first.');
+      return;
+    }
+    setResetBusy(true);
+    try {
+      await sendPasswordReset(email);
+      setResetSent(true);
+    } catch (errReset) {
+      const code = errReset?.code || '';
+      if (code === 'auth/invalid-email') {
+        setResetErr('Invalid email address.');
+      } else if (code === 'auth/user-not-found') {
+        setResetErr('No account found for that email. Try New account or check spelling.');
+      } else if (code === 'auth/too-many-requests') {
+        setResetErr('Too many attempts. Wait a few minutes and try again.');
+      } else {
+        setResetErr(errReset?.message || 'Could not send reset email.');
+      }
+    } finally {
+      setResetBusy(false);
+    }
+  }
+
+  function closeForgot() {
+    setForgotOpen(false);
+    setResetSent(false);
+    setResetErr('');
+  }
+
   return (
     <div className="login-screen">
       <div className="login-card" role="main">
@@ -102,6 +140,7 @@ export default function LoginScreen() {
               setShowPassword(false);
               setLocalErr('');
               setAuthError('');
+              closeForgot();
             }}
           >
             Sign in
@@ -116,6 +155,7 @@ export default function LoginScreen() {
               setShowPassword(false);
               setLocalErr('');
               setAuthError('');
+              closeForgot();
             }}
           >
             New account
@@ -161,7 +201,57 @@ export default function LoginScreen() {
                 {showPassword ? <IconEyeOff /> : <IconEye />}
               </button>
             </div>
+            {mode === 'signin' ? (
+              <div className="login-forgot-row">
+                <button
+                  type="button"
+                  className="login-forgot-link"
+                  onClick={() => {
+                    setForgotOpen((v) => !v);
+                    setResetSent(false);
+                    setResetErr('');
+                    setAuthError('');
+                  }}
+                  aria-expanded={forgotOpen}
+                >
+                  {forgotOpen ? 'Hide' : 'Forgot password?'}
+                </button>
+              </div>
+            ) : null}
           </div>
+
+          {mode === 'signin' && forgotOpen ? (
+            <div className="login-forgot-panel">
+              {resetSent ? (
+                <div className="login-alert login-alert--success" role="status">
+                  <strong>Check your email.</strong> If <strong>{email.trim()}</strong> is registered, Firebase sent a link
+                  to set a new password. Look in <strong>Spam</strong> too. Then return here and sign in.
+                </div>
+              ) : (
+                <>
+                  <p className="login-forgot-hint muted small">
+                    Enter the email you use for this desk, then send a reset link.
+                  </p>
+                  {resetErr ? (
+                    <div className="login-alert" role="alert">
+                      {resetErr}
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="btn login-forgot-send"
+                    disabled={resetBusy}
+                    onClick={handlePasswordReset}
+                  >
+                    {resetBusy ? 'Sending…' : 'Email me a reset link'}
+                  </button>
+                </>
+              )}
+              <button type="button" className="login-forgot-back muted small" onClick={closeForgot}>
+                {resetSent ? 'Back to sign in' : 'Cancel'}
+              </button>
+            </div>
+          ) : null}
 
           {err ? (
             <div className="login-alert" role="alert">

@@ -752,6 +752,16 @@
   line-height: 1.25;
 }
 
+.dash-order-when {
+  margin-top: 0.4rem;
+  margin-bottom: 0.15rem;
+}
+
+.dash-order-when--empty {
+  margin: 0.35rem 0 0.15rem;
+  line-height: 1.35;
+}
+
 .dash-feed-client {
   display: inline-block;
   margin-top: 0.4rem;
@@ -780,6 +790,17 @@
   color: var(--warn);
   letter-spacing: -0.02em;
   line-height: 1.2;
+}
+
+.dash-feed-due--paid {
+  color: var(--ok);
+  font-size: 1.05rem;
+}
+
+.dash-feed-due--overpaid {
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 700;
 }
 
 .dash-feed-received {
@@ -1857,24 +1878,25 @@ label.inline input {
 }
 
 .app-shell--login > .login-screen {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
+  width: 100%;
 }
 
 .login-screen {
   position: relative;
   z-index: 2;
   isolation: isolate;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
-  align-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   padding: max(1.25rem, env(safe-area-inset-top, 0px))
     max(1rem, env(safe-area-inset-right, 0px))
     max(1.5rem, env(safe-area-inset-bottom, 0px))
     max(1rem, env(safe-area-inset-left, 0px));
   box-sizing: border-box;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -1882,10 +1904,14 @@ label.inline input {
 }
 
 .login-card {
-  width: 100%;
-  max-width: min(26.25rem, 100%);
+  width: min(100%, 26.25rem);
+  max-width: 100%;
   min-width: 0;
-  margin: 0;
+  margin-top: auto;
+  margin-bottom: auto;
+  margin-left: auto;
+  margin-right: auto;
+  flex-shrink: 0;
   padding: 2rem 1.5rem 1.75rem;
   border-radius: 22px;
   background: #fff;
@@ -1993,6 +2019,17 @@ label.inline input {
   box-shadow: 0 2px 12px rgba(45, 35, 90, 0.1);
 }
 
+.login-seg--nested {
+  margin-top: -0.65rem;
+  margin-bottom: 1.1rem;
+}
+
+.login-email-link-hint {
+  margin: 0 0 1.1rem;
+  line-height: 1.5;
+  max-width: 100%;
+}
+
 .login-form {
   display: flex;
   flex-direction: column;
@@ -2094,6 +2131,66 @@ label.inline input {
   outline-offset: 2px;
 }
 
+.login-forgot-row {
+  margin-top: 0.45rem;
+}
+
+.login-forgot-link {
+  padding: 0.2rem 0;
+  border: none;
+  background: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.login-forgot-link:hover {
+  color: var(--accent-hot);
+}
+
+.login-forgot-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(91, 74, 232, 0.18);
+  background: rgba(91, 74, 232, 0.05);
+  box-sizing: border-box;
+}
+
+.login-forgot-hint {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.login-forgot-send {
+  width: 100%;
+  justify-content: center;
+}
+
+.login-forgot-back {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  padding: 0.25rem 0;
+  border: none;
+  background: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.login-forgot-back:hover {
+  color: var(--text);
+}
+
 .login-alert {
   padding: 0.65rem 0.85rem;
   border-radius: 12px;
@@ -2104,6 +2201,12 @@ label.inline input {
   border: 1px solid rgba(234, 88, 12, 0.25);
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.login-alert--success {
+  color: #14532d;
+  background: rgba(13, 143, 79, 0.12);
+  border-color: rgba(13, 143, 79, 0.28);
 }
 
 .login-submit {

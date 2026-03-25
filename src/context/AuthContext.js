@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
 } from 'firebase/auth';
@@ -51,6 +52,18 @@ export function AuthProvider({ children }) {
     if (auth) await signOut(auth);
   }, []);
 
+  /** Firebase emails a reset link. After reset, user can return to this app URL. */
+  const sendPasswordReset = useCallback(async (email) => {
+    setAuthError('');
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error('Firebase not configured');
+    const trimmed = email.trim();
+    if (!trimmed) throw new Error('Email required');
+    const continueUrl =
+      typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}` : undefined;
+    await sendPasswordResetEmail(auth, trimmed, continueUrl ? { url: continueUrl } : undefined);
+  }, []);
+
   const value = useMemo(
     () => ({
       firebaseEnabled: firebaseOn,
@@ -60,9 +73,10 @@ export function AuthProvider({ children }) {
       setAuthError,
       signIn,
       signUp,
+      sendPasswordReset,
       logOut,
     }),
-    [firebaseOn, user, loading, authError, signIn, signUp, logOut]
+    [firebaseOn, user, loading, authError, signIn, signUp, sendPasswordReset, logOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

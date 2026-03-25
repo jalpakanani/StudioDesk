@@ -36,26 +36,51 @@ function isVisitFuture(v, today) {
   return end >= today
 }
 
+/** Sort key: event end (or start), else order date — for chronological upcoming list. */
+function futureOrderSortKey(order) {
+  const {from, to} = orderEventRange(order)
+  const end = to || from
+  const od = (order.orderDate || '').slice(0, 10)
+  return end || od || '9999-12-31'
+}
+
+/** Label for dashboard row: wedding/event span, else order (booked) date. */
+function upcomingOrderWhenLabel(order) {
+  const {from, to} = orderEventRange(order)
+  if (from) return formatDateRangeEn(from, to)
+  const od = (order.orderDate || '').slice(0, 10)
+  if (od) return `Booked ${formatDateRangeEn(od, od)}`
+  return ''
+}
+
 export default function Dashboard() {
   const {orders, clients, clientById, fieldVisits} = useStudio()
   const {setTab} = useTab()
 
-  const clientDues = useMemo(() => {
+  const futureOrderRows = useMemo(() => {
     const t = todayISO()
     return orders
       .map(o => {
         const received = sumPayments(o.clientPayments)
-        const due = (Number(o.totalAmount) || 0) - received
-        return {order: o, received, due}
+        const total = Number(o.totalAmount) || 0
+        const due = total - received
+        return {order: o, received, due, total}
       })
-      .filter(x => x.due > 0 && isOrderFuture(x.order, t))
-      .sort((a, b) => b.due - a.due)
+      .filter(x => isOrderFuture(x.order, t))
+      .sort((a, b) => {
+        const c = futureOrderSortKey(a.order).localeCompare(
+          futureOrderSortKey(b.order),
+        )
+        if (c !== 0) return c
+        if (b.due !== a.due) return b.due - a.due
+        return (a.order.title || '').localeCompare(b.order.title || '')
+      })
   }, [orders])
 
-  const totalClientDue = useMemo(
-    () => clientDues.reduce((s, x) => s + x.due, 0),
-    [clientDues],
-  )
+  /** Only unpaid portion on still-upcoming orders (stat tile). */
+  const totalClientDue = useMemo(() => {
+    return futureOrderRows.reduce((s, x) => s + Math.max(0, x.due), 0)
+  }, [futureOrderRows])
 
   const visitBalances = useMemo(() => {
     return (fieldVisits || []).map(v => {
@@ -289,19 +314,21 @@ export default function Dashboard() {
       <div className="dash-grid">
         <section className="card card-lift dash-card">
           <div className="dash-card-head">
-            <h3>Future order dues</h3>
+            <h3>Upcoming orders</h3>
             <p className="dash-card-subtitle">
-              Upcoming jobs with balance left to receive.
+              Future jobs on the calendar—shown even when fully paid; balance
+              due when anything is left to receive.
             </p>
           </div>
-          {clientDues.length === 0 ? (
+          {futureOrderRows.length === 0 ? (
             <div className="dash-empty dash-empty--orders">
               <span className="dash-empty-icon" aria-hidden="true">
                 ✦
               </span>
-              <p className="dash-empty-title">No dues on the horizon</p>
+              <p className="dash-empty-title">No upcoming orders</p>
               <p className="dash-empty-text">
-                When a future job has money pending, it lands here.
+                When an order&apos;s event is still today or ahead, it appears
+                here.
               </p>
               <button
                 type="button"
@@ -313,8 +340,11 @@ export default function Dashboard() {
             </div>
           ) : (
             <ul className="dash-feed">
-              {clientDues.map(({order, received, due}) => {
+              {futureOrderRows.map(({order, received, due, total}) => {
                 const cname = clientById.get(order.clientId)?.name || '—'
+                const dueOutstanding = Math.max(0, due)
+                const overpaid = due < 0
+                const whenLabel = upcomingOrderWhenLabel(order)
                 return (
                   <li
                     key={order.id}
@@ -322,12 +352,45 @@ export default function Dashboard() {
                   >
                     <div>
                       <div className="dash-feed-title">{order.title}</div>
+                      {whenLabel ? (
+                        <div className="dash-order-when">
+                          <span
+                            className="dash-pill-date"
+                            title="Event / shoot dates for this order"
+                          >
+                            {whenLabel}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="dash-order-when dash-order-when--empty muted small">
+                          No event date — set in order
+                        </p>
+                      )}
                       <div className="dash-feed-client">{cname}</div>
                     </div>
                     <div className="dash-feed-money">
-                      <div className="dash-feed-due">{formatINR(due)}</div>
+                      {dueOutstanding > 0 ? (
+                        <div className="dash-feed-due">
+                          {formatINR(dueOutstanding)}
+                        </div>
+                      ) : overpaid ? (
+                        <div className="dash-feed-due dash-feed-due--overpaid">
+                          Overpaid {formatINR(-due)}
+                        </div>
+                      ) : (
+                        <div className="dash-feed-due dash-feed-due--paid">
+                          Paid up
+                        </div>
+                      )}
                       <div className="dash-feed-received">
-                        Received {formatINR(received)}
+                        {total > 0 ? (
+                          <>
+                            Total {formatINR(total)} · Received{' '}
+                            {formatINR(received)}
+                          </>
+                        ) : (
+                          <>Received {formatINR(received)}</>
+                        )}
                       </div>
                     </div>
                   </li>

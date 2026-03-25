@@ -1,4 +1,4 @@
-import {useMemo} from 'react'
+import {useMemo, useState} from 'react'
 import {useStudio} from '../context/StudioContext'
 import {useTab} from '../context/TabContext'
 import {formatINR, sumPayments} from '../utils/money'
@@ -13,9 +13,16 @@ import {
   netVisitPendingAfterStudioPay,
   settlementNeedsLinkHint,
 } from '../utils/settlement'
+import {
+  addDaysISO,
+  localCalendarTodayISO,
+  orderEventStartsTomorrow,
+  orderPastDueWithBalance,
+  visitTouchesTomorrow,
+} from '../utils/reminders'
 
 function todayISO() {
-  return new Date().toISOString().slice(0, 10)
+  return localCalendarTodayISO()
 }
 
 /** Event / job still in the future (uses event to-date, else order date). Undated orders stay visible. */
@@ -56,7 +63,9 @@ function upcomingOrderWhenLabel(order) {
 export default function Dashboard() {
   const {orders, clients, clientById, fieldVisits} = useStudio()
   const {setTab} = useTab()
-
+  const [notifPerm, setNotifPerm] = useState(() =>
+    typeof Notification !== 'undefined' ? Notification.permission : 'denied',
+  )
   const futureOrderRows = useMemo(() => {
     const t = todayISO()
     return orders
@@ -147,6 +156,56 @@ export default function Dashboard() {
     [orders, fieldVisits],
   )
 
+  const tomorrowOrders = useMemo(() => {
+    const t = todayISO()
+    return orders
+      .filter(o => orderEventStartsTomorrow(o, t))
+      .map(o => ({
+        order: o,
+        client: clientById.get(o.clientId)?.name || '—',
+        when: upcomingOrderWhenLabel(o),
+      }))
+  }, [orders, clientById])
+
+  const tomorrowVisits = useMemo(() => {
+    const t = todayISO()
+    return (fieldVisits || [])
+      .filter(v => visitTouchesTomorrow(v, t))
+      .map(v => {
+        const {from, to} = fieldVisitRange(v)
+        return {v, rangeLabel: formatDateRangeEn(from, to)}
+      })
+  }, [fieldVisits])
+
+  const pastDueOrders = useMemo(() => {
+    const t = todayISO()
+    return orders
+      .filter(o => orderPastDueWithBalance(o, t))
+      .map(o => {
+        const received = sumPayments(o.clientPayments)
+        const due = (Number(o.totalAmount) || 0) - received
+        return {
+          order: o,
+          client: clientById.get(o.clientId)?.name || '—',
+          due: Math.max(0, due),
+          when: upcomingOrderWhenLabel(o),
+        }
+      })
+      .sort((a, b) => b.due - a.due)
+  }, [orders, clientById])
+
+  const hasReminders =
+    tomorrowOrders.length > 0 || tomorrowVisits.length > 0 || pastDueOrders.length > 0
+
+  async function requestBrowserNotifications() {
+    if (typeof Notification === 'undefined') return
+    const r = await Notification.requestPermission()
+    setNotifPerm(r)
+  }
+
+  const showReminderCard =
+    !isFresh && (hasReminders || notifPerm === 'default')
+
   return (
     <div className="panel">
       <div className="panel-head">
@@ -199,6 +258,93 @@ export default function Dashboard() {
           </span>
         </button>
       </div>
+
+      {showReminderCard ? (
+        <section className="card dash-reminders" aria-label="Reminders">
+          <div className="dash-reminders-head">
+            <h3 className="dash-reminders-title">Reminders</h3>
+            <div className="dash-reminders-actions">
+              {typeof Notification !== 'undefined' && notifPerm === 'default' ? (
+                <button type="button" className="btn btn-sm primary" onClick={requestBrowserNotifications}>
+                  Browser alerts
+                </button>
+              ) : null}
+            </div>
+            {typeof Notification !== 'undefined' && notifPerm === 'denied' ? (
+              <span className="muted small">Alerts blocked — allow notifications in browser settings.</span>
+            ) : null}
+            {notifPerm === 'granted' ? (
+              <span className="muted small dash-reminders-ok">Browser alerts on</span>
+            ) : null}
+          </div>
+          <p className="dash-reminders-lead muted small">
+            <strong>Browser alerts</strong> — system notifications while this tab stays open, up to{' '}
+            <strong>5 times per day</strong> per reminder type, with spacing so they do not stack.
+          </p>
+          {tomorrowOrders.length > 0 ? (
+            <div className="dash-reminder-block">
+              <h4 className="dash-reminder-block-title">
+                Tomorrow (
+                {formatDateRangeEn(addDaysISO(todayISO(), 1), addDaysISO(todayISO(), 1))})
+              </h4>
+              <ul className="dash-reminder-list">
+                {tomorrowOrders.map(({order, client, when}) => (
+                  <li key={order.id}>
+                    <button type="button" className="dash-reminder-row" onClick={() => setTab('orders')}>
+                      <span className="dash-reminder-main">
+                        <strong>{order.title}</strong>
+                        <span className="muted small">{client}</span>
+                      </span>
+                      <span className="dash-reminder-meta muted small">{when}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {tomorrowVisits.length > 0 ? (
+            <div className="dash-reminder-block">
+              <h4 className="dash-reminder-block-title">My exposing tomorrow</h4>
+              <ul className="dash-reminder-list">
+                {tomorrowVisits.map(({v, rangeLabel}) => (
+                  <li key={v.id}>
+                    <button type="button" className="dash-reminder-row" onClick={() => setTab('field')}>
+                      <span className="dash-reminder-main">
+                        <strong>{v.hostName}</strong>
+                        {v.venue ? <span className="muted small">{v.venue}</span> : null}
+                      </span>
+                      <span className="dash-reminder-meta muted small">{rangeLabel}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {pastDueOrders.length > 0 ? (
+            <div className="dash-reminder-block">
+              <h4 className="dash-reminder-block-title">Collect payment (event over, balance left)</h4>
+              <ul className="dash-reminder-list">
+                {pastDueOrders.map(({order, client, due, when}) => (
+                  <li key={order.id}>
+                    <button type="button" className="dash-reminder-row" onClick={() => setTab('orders')}>
+                      <span className="dash-reminder-main">
+                        <strong>{order.title}</strong>
+                        <span className="muted small">{client}</span>
+                      </span>
+                      <span className="dash-reminder-meta warn">{formatINR(due)} due</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {!hasReminders && notifPerm === 'default' ? (
+            <p className="muted small" style={{margin: 0}}>
+              No list items right now. Turn on browser alerts to get pings when jobs or payments need attention.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {isFresh ? (
         <div className="welcome-banner">

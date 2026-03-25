@@ -356,6 +356,115 @@
   color: var(--muted);
 }
 
+/* ——— Dashboard reminders ——— */
+.dash-reminders {
+  margin-bottom: 1.25rem;
+  padding: 1.1rem 1.15rem 1.15rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(91, 74, 232, 0.2);
+  background: linear-gradient(165deg, rgba(91, 74, 232, 0.07), rgba(255, 255, 255, 0.92));
+  box-shadow: var(--shadow-sm);
+}
+
+.dash-reminders-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.dash-reminders-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.dash-reminders-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-family: var(--font-display);
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dash-reminders-ok {
+  font-weight: 600;
+  color: var(--ok);
+}
+
+.dash-reminders-lead {
+  margin: 0 0 1rem;
+  line-height: 1.45;
+  max-width: 52ch;
+}
+
+.dash-reminder-block {
+  margin-bottom: 1rem;
+}
+
+.dash-reminder-block:last-child {
+  margin-bottom: 0;
+}
+
+.dash-reminder-block-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.dash-reminder-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.dash-reminder-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  box-sizing: border-box;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.dash-reminder-row:hover {
+  border-color: rgba(91, 74, 232, 0.28);
+  box-shadow: 0 4px 14px rgba(45, 35, 90, 0.06);
+}
+
+.dash-reminder-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.dash-reminder-meta {
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
 /* ——— Welcome ——— */
 .welcome-banner {
   position: relative;

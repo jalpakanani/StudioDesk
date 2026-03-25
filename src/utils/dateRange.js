@@ -10,8 +10,9 @@ export function fieldVisitRange(v) {
 
 /** Order event span (e.g. multi-day wedding). */
 export function orderEventRange(o) {
-  const from = String(o?.eventDateFrom || '').slice(0, 10);
+  let from = String(o?.eventDateFrom || '').slice(0, 10);
   let to = String(o?.eventDateTo || '').slice(0, 10);
+  if (!from && to) from = to;
   if (!from) return { from: '', to: '' };
   if (!to) to = from;
   if (to < from) to = from;

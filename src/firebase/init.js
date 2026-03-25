@@ -5,6 +5,7 @@ import { getFirestore } from 'firebase/firestore';
 /**
  * Firebase web config from Console → Project settings. Only these four must be set in .env.local;
  * storage bucket + messaging sender id get sensible defaults if omitted (common reason login never showed).
+ * messagingSenderId is optional for Auth + Firestore; keep it if your Console shows it.
  */
 export function getResolvedFirebaseConfig() {
   const apiKey = process.env.REACT_APP_FIREBASE_API_KEY?.trim();

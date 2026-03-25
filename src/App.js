@@ -1,6 +1,7 @@
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { StudioProvider, useStudio } from './context/StudioContext';
 import { TabProvider, useTab } from './context/TabContext';
+import { useReminderNotifications } from './hooks/useReminderNotifications';
 import './App.css';
 import Dashboard from './components/Dashboard';
 import ClientsView from './components/ClientsView';
@@ -15,6 +16,12 @@ const TABS = [
   { id: 'orders', label: 'Orders', icon: '▤' },
   { id: 'field', label: 'My Exposing', icon: '⌖' },
 ];
+
+function ReminderRunner() {
+  const { orders, fieldVisits } = useStudio();
+  useReminderNotifications(orders, fieldVisits);
+  return null;
+}
 
 function Shell() {
   const { tab, setTab } = useTab();
@@ -34,6 +41,7 @@ function Shell() {
 
   return (
     <div className="app-shell">
+      <ReminderRunner />
       <div className="app-bg" aria-hidden="true" />
       <header className="app-header">
         <div className="header-inner">

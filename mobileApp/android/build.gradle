@@ -6,16 +6,29 @@ buildscript {
         targetSdkVersion = 35
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.1.20"
+        // Pin AGP for Android Studio compatibility (RN’s composite build defaults to 8.12.x).
+        androidGradlePluginVersion = "8.9.2"
     }
     repositories {
         google()
         mavenCentral()
     }
-    dependencies {
-        classpath("com.android.tools.build:gradle")
-        classpath("com.facebook.react:react-native-gradle-plugin")
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+    configurations.classpath {
+        resolutionStrategy {
+            force("com.android.tools.build:gradle:${androidGradlePluginVersion}")
+        }
     }
+    dependencies {
+        classpath("com.android.tools.build:gradle:${androidGradlePluginVersion}")
+        classpath("com.facebook.react:react-native-gradle-plugin")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
+    }
+}
+
+// Used by libraries (e.g. react-native-gesture-handler) that otherwise run `node` during
+// configuration. Android Studio often has no nvm/fnm/Homebrew on PATH, so `node` is missing.
+ext {
+    REACT_NATIVE_NODE_MODULES_DIR = new File(rootDir, "../node_modules/react-native").canonicalPath
 }
 
 apply plugin: "com.facebook.react.rootproject"

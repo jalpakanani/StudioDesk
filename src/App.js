@@ -18,8 +18,8 @@ const TABS = [
 ];
 
 function ReminderRunner() {
-  const { orders, fieldVisits } = useStudio();
-  useReminderNotifications(orders, fieldVisits);
+  const { orders, fieldVisits, clientById } = useStudio();
+  useReminderNotifications(orders, fieldVisits, clientById);
   return null;
 }
 

@@ -11,8 +11,8 @@ import { useReminderNotificationsMobile } from './src/hooks/useReminderNotificat
 import { colors } from './src/theme';
 
 function ReminderNotificationsBridge() {
-  const { orders, fieldVisits } = useStudio();
-  useReminderNotificationsMobile(orders, fieldVisits ?? []);
+  const { orders, fieldVisits, clientById } = useStudio();
+  useReminderNotificationsMobile(orders, fieldVisits ?? [], clientById);
   return null;
 }
 

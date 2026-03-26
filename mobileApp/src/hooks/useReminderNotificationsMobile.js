@@ -5,6 +5,7 @@ import {
   localCalendarTodayISO,
   orderEventStartsTomorrow,
   orderPastDueWithBalance,
+  orderReminderLabel,
   visitTouchesTomorrow,
 } from '../utils/reminders';
 import {
@@ -28,7 +29,7 @@ function notifIdFromTag(tag) {
  * Local notifications (Notifee) when permission is granted — same rules as web
  * `useReminderNotifications`: tomorrow / pay-due caps and spacing via AsyncStorage.
  */
-export function useReminderNotificationsMobile(orders, fieldVisits) {
+export function useReminderNotificationsMobile(orders, fieldVisits, clientById) {
   useEffect(() => {
     let cancelled = false;
     let intervalId;
@@ -73,7 +74,7 @@ export function useReminderNotificationsMobile(orders, fieldVisits) {
         if (tomorrowOrders.length) {
           parts.push(
             `Orders: ${tomorrowOrders
-              .map((o) => o.title || 'Job')
+              .map((o) => orderReminderLabel(o, clientById))
               .slice(0, 3)
               .join(', ')}${tomorrowOrders.length > 3 ? '…' : ''}`,
           );
@@ -124,10 +125,14 @@ export function useReminderNotificationsMobile(orders, fieldVisits) {
           if (payDue.length === 1) {
             const o = payDue[0];
             const due = (Number(o.totalAmount) || 0) - sumPayments(o.clientPayments);
-            body = `${o.title || 'Order'}: still due ${formatINR(Math.max(0, due))}`;
+            body = `${orderReminderLabel(o, clientById)}: still due ${formatINR(Math.max(0, due))}`;
             tag = `desk-pay-${o.id}`;
           } else {
-            body = `${payDue.length} jobs have balance after the event date. Open your desk.`;
+            const sample = payDue
+              .slice(0, 3)
+              .map((o) => orderReminderLabel(o, clientById))
+              .join(' · ');
+            body = `${payDue.length} jobs — ${sample}${payDue.length > 3 ? '…' : ''}. Open your desk.`;
             tag = `desk-pay-b-${paySig.slice(0, 48)}`;
           }
           await notifee.displayNotification({
@@ -156,5 +161,5 @@ export function useReminderNotificationsMobile(orders, fieldVisits) {
       cancelled = true;
       if (intervalId) clearInterval(intervalId);
     };
-  }, [orders, fieldVisits]);
+  }, [orders, fieldVisits, clientById]);
 }

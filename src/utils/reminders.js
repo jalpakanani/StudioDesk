@@ -1,6 +1,14 @@
 import { coerceDateFieldToISO, fieldVisitRange, orderEventRange } from './dateRange';
 import { sumPayments } from './money';
 
+export function orderReminderLabel(order, clientById) {
+  if (!order) return 'Job';
+  const t = String(order.title || '').trim() || 'Job';
+  const client = clientById?.get?.(order.clientId);
+  const name = client && String(client.name || '').trim();
+  return name ? `${t} (${name})` : t;
+}
+
 const DAY_SLOTS_PREFIX = 'my-studio-desk-notifSlots';
 
 /** Local calendar YYYY-MM-DD — matches browser date inputs and reminder logic (not UTC midnight). */

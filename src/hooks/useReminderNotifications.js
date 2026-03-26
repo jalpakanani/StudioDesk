@@ -5,6 +5,7 @@ import {
   localCalendarTodayISO,
   orderEventStartsTomorrow,
   orderPastDueWithBalance,
+  orderReminderLabel,
   readDaySlots,
   readReminderSig,
   recordDailySlot,
@@ -22,7 +23,7 @@ const MAX_NOTIFS_PER_KIND_PER_DAY = 5;
  * at least ~2h 45m apart, while this tab stays open (interval) or when data changes.
  * Adding another job for tomorrow (or another pay-due order) bypasses the gap once so each new item can ping.
  */
-export function useReminderNotifications(orders, fieldVisits) {
+export function useReminderNotifications(orders, fieldVisits, clientById) {
   useEffect(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return undefined;
 
@@ -52,7 +53,7 @@ export function useReminderNotifications(orders, fieldVisits) {
         const parts = [];
         if (tomorrowOrders.length) {
           parts.push(
-            `Orders: ${tomorrowOrders.map((o) => o.title || 'Job').slice(0, 3).join(', ')}${
+            `Orders: ${tomorrowOrders.map((o) => orderReminderLabel(o, clientById)).slice(0, 3).join(', ')}${
               tomorrowOrders.length > 3 ? '…' : ''
             }`
           );
@@ -96,12 +97,16 @@ export function useReminderNotifications(orders, fieldVisits) {
             const o = payDue[0];
             const due = (Number(o.totalAmount) || 0) - sumPayments(o.clientPayments);
             new Notification('My Studio Desk — collect payment', {
-              body: `${o.title || 'Order'}: still due ${formatINR(Math.max(0, due))}`,
+              body: `${orderReminderLabel(o, clientById)}: still due ${formatINR(Math.max(0, due))}`,
               tag: `desk-pay-${o.id}`,
             });
           } else {
+            const sample = payDue
+              .slice(0, 3)
+              .map((o) => orderReminderLabel(o, clientById))
+              .join(' · ');
             new Notification('My Studio Desk — collect payment', {
-              body: `${payDue.length} jobs have balance after the event date. Open your desk.`,
+              body: `${payDue.length} jobs — ${sample}${payDue.length > 3 ? '…' : ''}. Open your desk.`,
               tag: `desk-pay-b-${paySig.slice(0, 48)}`,
             });
           }
@@ -116,5 +121,5 @@ export function useReminderNotifications(orders, fieldVisits) {
     run();
     const id = window.setInterval(run, MIN_GAP_MS);
     return () => window.clearInterval(id);
-  }, [orders, fieldVisits]);
+  }, [orders, fieldVisits, clientById]);
 }

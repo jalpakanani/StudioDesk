@@ -28,6 +28,7 @@ export default function OrdersView() {
   const [newOrderDate, setNewOrderDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [newEventFrom, setNewEventFrom] = useState('');
   const [newEventTo, setNewEventTo] = useState('');
+  const [newAddress, setNewAddress] = useState('');
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) || null, [orders, selectedId]);
 
@@ -57,12 +58,14 @@ export default function OrdersView() {
       orderDate: newOrderDate,
       eventDateFrom: newEventFrom,
       eventDateTo: newEventTo || newEventFrom,
+      address: newAddress,
     });
     if (o) {
       setNewTitle('');
       setNewTotal('');
       setNewEventFrom('');
       setNewEventTo('');
+      setNewAddress('');
       setSelectedId(o.id);
     }
   }
@@ -150,6 +153,15 @@ export default function OrdersView() {
               min={newEventFrom || undefined}
             />
           </label>
+          <label className="full">
+            Venue / address
+            <textarea
+              rows={2}
+              value={newAddress}
+              onChange={(e) => setNewAddress(e.target.value)}
+              placeholder="Shoot or delivery address (optional)"
+            />
+          </label>
           <div className="form-actions">
             <button type="submit" className="btn primary shine" disabled={!clients.length}>
               Create order
@@ -197,6 +209,11 @@ export default function OrdersView() {
                       <span className={due > 0 ? 'warn' : 'ok'}>{formatINR(Math.max(0, due))}</span>
                     </div>
                     {evLabel ? <div className="muted small">Event: {evLabel}</div> : null}
+                    {o.address ? (
+                      <div className="muted small" style={{ marginTop: 2 }}>
+                        {o.address.length > 72 ? `${o.address.slice(0, 72)}…` : o.address}
+                      </div>
+                    ) : null}
                     {guestCount > 0 ? (
                       <div className="pick-guest-hint">{guestCount} coming to studio</div>
                     ) : null}
@@ -265,6 +282,7 @@ function OrderDetail({
     return to;
   });
   const [notes, setNotes] = useState(order.notes || '');
+  const [address, setAddress] = useState(order.address || '');
   const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [payNote, setPayNote] = useState('');
@@ -286,6 +304,7 @@ function OrderDetail({
       eventDateFrom: evFrom,
       eventDateTo: evTo,
       notes: notes.trim(),
+      address: address.trim(),
     });
   }
 
@@ -345,6 +364,15 @@ function OrderDetail({
         <p className="muted small full" style={{ gridColumn: '1 / -1', margin: '-0.25rem 0 0' }}>
           For single-day events, leave &quot;Event to&quot; empty. For weddings across several days, set both.
         </p>
+        <label className="full">
+          Venue / address
+          <textarea
+            rows={2}
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Shoot or delivery address (optional)"
+          />
+        </label>
         <label className="full">
           Notes
           <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />

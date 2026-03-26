@@ -45,6 +45,7 @@ export default function OrdersListScreen() {
   );
   const [newEventFrom, setNewEventFrom] = useState('');
   const [newEventTo, setNewEventTo] = useState('');
+  const [newAddress, setNewAddress] = useState('');
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
   const [pulseOrderId, setPulseOrderId] = useState(null);
 
@@ -94,12 +95,14 @@ export default function OrdersListScreen() {
       orderDate: orderDateISO,
       eventDateFrom: evFrom,
       eventDateTo: evToRaw || evFrom,
+      address: newAddress,
     });
     if (o) {
       setNewTitle('');
       setNewTotal('');
       setNewEventFrom('');
       setNewEventTo('');
+      setNewAddress('');
       setNewClientId('');
       setShowNewOrderForm(false);
       navigation.navigate('OrderDetail', { orderId: o.id });
@@ -114,6 +117,7 @@ export default function OrdersListScreen() {
     setNewOrderDate(formatISODateDisplay(new Date().toISOString().slice(0, 10)));
     setNewEventFrom('');
     setNewEventTo('');
+    setNewAddress('');
   }
 
   function openNewOrderForm() {
@@ -243,6 +247,17 @@ export default function OrdersListScreen() {
               placeholderTextColor={colors.muted}
             />
 
+            <Text style={styles.labelCaps}>Venue / address</Text>
+            <TextInput
+              style={[styles.input, styles.inputArea]}
+              value={newAddress}
+              onChangeText={setNewAddress}
+              placeholder="Shoot or delivery address (optional)"
+              placeholderTextColor={colors.muted}
+              multiline
+              textAlignVertical="top"
+            />
+
             <TouchableOpacity
               style={[
                 styles.createBtn,
@@ -297,6 +312,11 @@ export default function OrdersListScreen() {
                 <Text style={due > 0 ? styles.warn : styles.ok}>{formatINR(Math.max(0, due))}</Text>
               </Text>
               {evLabel ? <Text style={styles.jobMeta}>Event: {evLabel}</Text> : null}
+              {o.address ? (
+                <Text style={styles.jobAddress} numberOfLines={2}>
+                  {o.address}
+                </Text>
+              ) : null}
               {guestCount > 0 ? (
                 <Text style={styles.guestHint}>{guestCount} coming to studio</Text>
               ) : null}
@@ -435,6 +455,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
+  inputArea: { minHeight: 80, paddingTop: 12 },
   createBtn: {
     marginTop: 18,
     backgroundColor: colors.primary,
@@ -483,6 +504,7 @@ const styles = StyleSheet.create({
   },
   jobTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
   jobMeta: { fontSize: 13, color: colors.muted, marginTop: 4 },
+  jobAddress: { fontSize: 12, color: colors.muted, marginTop: 4, lineHeight: 17 },
   warn: { color: colors.warn, fontWeight: '700' },
   ok: { color: colors.success, fontWeight: '700' },
   guestHint: { fontSize: 12, color: colors.primary, fontWeight: '600', marginTop: 6 },

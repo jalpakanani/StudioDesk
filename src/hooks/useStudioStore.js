@@ -199,6 +199,7 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
       eventDateTo: evTo,
       totalAmount: Number(payload.totalAmount) || 0,
       notes: String(payload.notes || '').trim(),
+      address: String(payload.address || '').trim(),
       clientPayments: [],
       exposures: [],
       exposureGuests: [],

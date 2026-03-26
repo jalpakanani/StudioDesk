@@ -44,7 +44,7 @@ export function buildDeskSearchResults(rawQuery, { clients, orders, fieldVisits,
 
   for (const o of orders || []) {
     const client = clientById?.get?.(o.clientId);
-    const text = haystack([o.title, o.notes, client?.name, client?.phone]);
+    const text = haystack([o.title, o.notes, o.address, client?.name, client?.phone]);
     if (!matchesTokens(text, tokens)) continue;
     const ev = orderEventRange(o);
     const when = ev.from ? formatDateRangeEn(ev.from, ev.to) : '';

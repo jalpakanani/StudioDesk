@@ -125,6 +125,7 @@ function OrderMetaForm({ order, updateOrder }) {
     return formatISODateDisplay(to);
   });
   const [notes, setNotes] = useState(order.notes || '');
+  const [address, setAddress] = useState(order.address || '');
 
   useEffect(() => {
     const r = orderEventRange(order);
@@ -149,6 +150,7 @@ function OrderMetaForm({ order, updateOrder }) {
       eventDateFrom: evFrom,
       eventDateTo: evTo,
       notes: notes.trim(),
+      address: address.trim(),
     });
   }
 
@@ -195,6 +197,17 @@ function OrderMetaForm({ order, updateOrder }) {
       <Text style={styles.helper}>
         For single-day events, leave &quot;Event to&quot; empty. For weddings across several days, set both.
       </Text>
+
+      <Text style={styles.labelCaps}>Venue / address</Text>
+      <TextInput
+        style={[styles.input, styles.textArea]}
+        value={address}
+        onChangeText={setAddress}
+        multiline
+        textAlignVertical="top"
+        placeholder="Shoot or delivery address (optional)"
+        placeholderTextColor={colors.muted}
+      />
 
       <Text style={styles.labelCaps}>Notes</Text>
       <TextInput

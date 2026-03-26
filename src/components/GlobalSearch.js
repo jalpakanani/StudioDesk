@@ -78,7 +78,7 @@ export default function GlobalSearch() {
         <span className="global-search-field-icon" aria-hidden="true">
           <svg
             className="global-search-field-svg"
-            viewBox="0 0 30 30"
+            viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             strokeWidth="2.25"
@@ -86,8 +86,8 @@ export default function GlobalSearch() {
             strokeLinejoin="round"
             focusable="false"
           >
-            <circle cx="11" cy="11" r="7" />
-            <path d="M20 20l-4.3-4.3" />
+            <circle cx="10.5" cy="10.5" r="5.75" />
+            <path d="M15.5 15.5L21 21" />
           </svg>
         </span>
         <input

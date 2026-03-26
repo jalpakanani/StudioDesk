@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Modal,
@@ -10,7 +10,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useStudio } from '../context/StudioContext';
+import OpenDeskSearchButton from '../components/OpenDeskSearchButton';
 import { fieldVisitRange, formatDateRangeEn, formatISODateDisplay, toISODateOr } from '../utils/dateRange';
 import { formatINR, sumPayments } from '../utils/money';
 import { groupedFieldVisitCardStats } from '../utils/settlement';
@@ -29,6 +31,8 @@ function oneVisitCard(v) {
 }
 
 export default function FieldVisitsScreen() {
+  const route = useRoute();
+  const navigation = useNavigation();
   const {
     orders,
     fieldVisits,
@@ -41,6 +45,8 @@ export default function FieldVisitsScreen() {
   const [addOpen, setAddOpen] = useState(false);
   const [detail, setDetail] = useState(null);
   const [tipOpen, setTipOpen] = useState(false);
+  const [flashVisitId, setFlashVisitId] = useState(null);
+  const listRef = useRef(null);
   const visits = useMemo(() => fieldVisits ?? [], [fieldVisits]);
 
   const sorted = useMemo(() => {
@@ -64,6 +70,28 @@ export default function FieldVisitsScreen() {
     if (next) setDetail(next);
   }, [visits, detail]);
 
+  const highlightVisitId = route.params?.highlightVisitId;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!highlightVisitId) return undefined;
+      const idx = sorted.findIndex((v) => v.id === highlightVisitId);
+      setFlashVisitId(highlightVisitId);
+      const tScroll = setTimeout(() => {
+        if (idx >= 0) {
+          listRef.current?.scrollToIndex({ index: idx, viewPosition: 0.12 });
+        }
+      }, 200);
+      const tPulse = setTimeout(() => setFlashVisitId(null), 2200);
+      const tParam = setTimeout(() => navigation.setParams({ highlightVisitId: undefined }), 100);
+      return () => {
+        clearTimeout(tScroll);
+        clearTimeout(tPulse);
+        clearTimeout(tParam);
+      };
+    }, [highlightVisitId, sorted, navigation]),
+  );
+
   const ListHeader = useCallback(
     () => (
       <View style={styles.headerBlock}>
@@ -83,9 +111,12 @@ export default function FieldVisitsScreen() {
               </Text>
             ) : null}
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
-            <Text style={styles.addBtnText}>+ New</Text>
-          </TouchableOpacity>
+          <View style={styles.headActions}>
+            <OpenDeskSearchButton />
+            <TouchableOpacity style={styles.addBtn} onPress={() => setAddOpen(true)}>
+              <Text style={styles.addBtnText}>+ New</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <Text style={styles.subhead}>Entries ({sorted.length})</Text>
@@ -106,11 +137,20 @@ export default function FieldVisitsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <FlatList
+        ref={listRef}
         data={sorted}
         keyExtractor={(v) => v.id}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={null}
         contentContainerStyle={styles.list}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            listRef.current?.scrollToIndex({
+              index: info.index,
+              viewPosition: 0.12,
+            });
+          }, 350);
+        }}
         renderItem={({ item: v }) => {
           const { from, to } = fieldVisitRange(v);
           const card = cardStatsByVisitId.get(v.id) || oneVisitCard(v);
@@ -118,7 +158,10 @@ export default function FieldVisitsScreen() {
           const received = card.received;
           const due = card.due;
           return (
-            <TouchableOpacity style={styles.row} onPress={() => setDetail(v)}>
+            <TouchableOpacity
+              style={[styles.row, flashVisitId === v.id && styles.rowPulse]}
+              onPress={() => setDetail(v)}
+            >
               <View style={{ flex: 1 }}>
                 <View style={styles.whenRow}>
                   <Text style={styles.whenStrong}>{formatDateRangeEn(from, to)}</Text>
@@ -400,6 +443,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   headerBlock: { paddingHorizontal: 16, paddingBottom: 8 },
   headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  headActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
   lead: { fontSize: 14, color: colors.muted, marginTop: 8, lineHeight: 20, maxWidth: 320 },
   tipToggle: { marginTop: 10, alignSelf: 'flex-start' },
@@ -436,6 +480,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  rowPulse: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+    backgroundColor: colors.accentSoft,
   },
   rowTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
   rowSub: { fontSize: 13, color: colors.muted, marginTop: 2 },

@@ -1,10 +1,18 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Platform, StyleSheet, Text } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DashboardScreen from '../screens/DashboardScreen';
 import ClientsScreen from '../screens/ClientsScreen';
 import OrdersStack from './OrdersStack';
 import FieldVisitsScreen from '../screens/FieldVisitsScreen';
+import SettingsScreen from '../screens/SettingsScreen';
+import {
+  TabClientsIcon,
+  TabDeskIcon,
+  TabFieldIcon,
+  TabOrdersIcon,
+  TabSettingsIcon,
+} from './tabBarIcons';
 import { colors } from '../theme';
 
 const Tab = createBottomTabNavigator();
@@ -43,35 +51,39 @@ export default function MainTabs() {
         component={DashboardScreen}
         options={{
           tabBarLabel: 'Desk',
-          tabBarIcon: ({ color }) => <TabGlyph char="◇" color={color} />,
+          tabBarIcon: ({ color }) => <TabDeskIcon color={color} />,
         }}
       />
       <Tab.Screen
         name="Clients"
         component={ClientsScreen}
-        options={{ tabBarIcon: ({ color }) => <TabGlyph char="◎" color={color} /> }}
+        options={{
+          tabBarIcon: ({ color }) => <TabClientsIcon color={color} />,
+        }}
       />
       <Tab.Screen
         name="Orders"
         component={OrdersStack}
-        options={{ tabBarIcon: ({ color }) => <TabGlyph char="▤" color={color} /> }}
+        options={{
+          tabBarIcon: ({ color }) => <TabOrdersIcon color={color} />,
+        }}
       />
       <Tab.Screen
         name="Field"
         component={FieldVisitsScreen}
         options={{
           tabBarLabel: 'Exposing',
-          tabBarIcon: ({ color }) => <TabGlyph char="⌖" color={color} />,
+          tabBarIcon: ({ color }) => <TabFieldIcon color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{
+          tabBarLabel: 'Settings',
+          tabBarIcon: ({ color }) => <TabSettingsIcon color={color} />,
         }}
       />
     </Tab.Navigator>
   );
 }
-
-function TabGlyph({ char, color }) {
-  return <Text style={[glyphStyles.text, { color }]}>{char}</Text>;
-}
-
-const glyphStyles = StyleSheet.create({
-  text: { fontSize: 17, fontWeight: '600' },
-});

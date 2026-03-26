@@ -6,7 +6,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { StudioProvider, useStudio } from './src/context/StudioContext';
 import { isFirebaseConfigured } from './src/firebase/init';
 import LoginScreen from './src/screens/LoginScreen';
-import MainTabs from './src/navigation/MainTabs';
+import RootStack from './src/navigation/RootStack';
 import { useReminderNotificationsMobile } from './src/hooks/useReminderNotificationsMobile';
 import { colors } from './src/theme';
 
@@ -90,7 +90,7 @@ function Root() {
   return (
     <StudioProvider useCloud syncUserId={auth.user.uid}>
       <SyncGate>
-        <MainTabs />
+        <RootStack />
       </SyncGate>
     </StudioProvider>
   );

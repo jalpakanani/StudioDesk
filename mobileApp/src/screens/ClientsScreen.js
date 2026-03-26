@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import {
   FlatList,
   Modal,
@@ -10,9 +11,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStudio } from '../context/StudioContext';
+import OpenDeskSearchButton from '../components/OpenDeskSearchButton';
 import { colors, radius } from '../theme';
 
 export default function ClientsScreen() {
+  const route = useRoute();
+  const navigation = useNavigation();
+  const listRef = useRef(null);
   const { clients, addClient, updateClient, removeClient } = useStudio();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -29,10 +34,31 @@ export default function ClientsScreen() {
     }
   }, [addClient, name, phone, notes]);
 
+  const highlightClientId = route.params?.highlightClientId;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!highlightClientId) return undefined;
+      const idx = clients.findIndex((c) => c.id === highlightClientId);
+      if (idx < 0) {
+        navigation.setParams({ highlightClientId: undefined });
+        return undefined;
+      }
+      const t = setTimeout(() => {
+        listRef.current?.scrollToIndex({ index: idx, viewPosition: 0.12 });
+        navigation.setParams({ highlightClientId: undefined });
+      }, 200);
+      return () => clearTimeout(t);
+    }, [highlightClientId, clients, navigation]),
+  );
+
   const listHeader = useMemo(
     () => (
       <View style={styles.headerBlock}>
-        <Text style={styles.title}>Clients</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>Clients</Text>
+          <OpenDeskSearchButton />
+        </View>
         <Text style={styles.lead}>People you shoot for—used on every order and payment line.</Text>
 
         {clients.length === 0 ? (
@@ -86,9 +112,18 @@ export default function ClientsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <FlatList
+        ref={listRef}
         data={clients}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={listHeader}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            listRef.current?.scrollToIndex({
+              index: info.index,
+              viewPosition: 0.12,
+            });
+          }, 300);
+        }}
         ListEmptyComponent={
           clients.length === 0 ? null : <Text style={styles.muted}>No clients yet.</Text>
         }
@@ -156,7 +191,14 @@ function EditForm({ c, onSave, onClose }) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   headerBlock: { paddingHorizontal: 16, paddingBottom: 8 },
-  title: { fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 0,
+  },
+  title: { flex: 1, fontSize: 22, fontWeight: '800', color: colors.text, letterSpacing: -0.3 },
   lead: { fontSize: 14, color: colors.muted, marginTop: 8, lineHeight: 20 },
   emptySpot: {
     marginTop: 14,

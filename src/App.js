@@ -49,7 +49,20 @@ function Shell() {
           <div className="header-top">
             <div className="brand">
               <span className="brand-mark" aria-hidden="true">
-                S
+                <svg
+                  className="brand-mark-svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  focusable="false"
+                >
+                  <path
+                    d="M12 4l7.2 7.2L12 18.4 4.8 11.2 12 4z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </span>
               <div>
                 <h1>My Studio Desk</h1>

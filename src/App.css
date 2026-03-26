@@ -115,15 +115,22 @@
   border-radius: 14px;
   display: grid;
   place-items: center;
-  font-weight: 800;
-  font-size: 1.15rem;
   color: #fff;
   background: linear-gradient(145deg, var(--accent), var(--accent-hot));
   box-shadow: var(--shadow-glow);
-  letter-spacing: -0.03em;
   transition:
     transform 0.25s ease,
     box-shadow 0.25s ease;
+}
+
+.brand-mark-svg {
+  width: 26px;
+  height: 26px;
+  display: block;
+}
+
+.brand-mark-svg path {
+  vector-effect: non-scaling-stroke;
 }
 
 .brand-mark:hover {
@@ -2565,12 +2572,11 @@ label.inline input {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 1.375rem;
-  height: 1.375rem;
-  color: var(--muted);
-  opacity: 0.85;
-  /* Lens + handle read slightly high in the box; nudge down to match text cap-height */
-  transform: translateY(1px);
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--accent);
+  opacity: 0.92;
+  transform: translateY(0.5px);
 }
 
 .global-search-field-svg {

@@ -1,14 +1,23 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { useAuth } from '../context/AuthContext';
 import { useStudio } from '../context/StudioContext';
 import {
+  calendarWeekRangeISO,
   coerceDateFieldToISO,
   fieldVisitRange,
   formatDateRangeEn,
   orderEventRange,
+  rangeOverlapsWindow,
 } from '../utils/dateRange';
 import { formatINR, sumPayments } from '../utils/money';
 import {
@@ -25,7 +34,9 @@ import {
   settlementNeedsLinkHint,
 } from '../utils/settlement';
 import { colors, radius } from '../theme';
-import { getDeskNotificationState, requestDeskNotificationPermission } from '../notifications/notifeeDesk';
+import { getDeskNotificationState } from '../notifications/notifeeDesk';
+import OpenDeskSearchButton from '../components/OpenDeskSearchButton';
+import { navigateToDeskSettings } from '../navigation/navigateSettings';
 
 function todayISO() {
   return localCalendarTodayISO();
@@ -64,8 +75,7 @@ function upcomingOrderWhenLabel(order) {
 
 export default function DashboardScreen() {
   const navigation = useNavigation();
-  const { logOut, user } = useAuth();
-  const { orders, clients, clientById, fieldVisits, syncError, cloudSync } = useStudio();
+  const { orders, clients, clientById, fieldVisits, syncError } = useStudio();
   const [notifAuth, setNotifAuth] = useState(false);
   const [notifDenied, setNotifDenied] = useState(false);
 
@@ -84,26 +94,21 @@ export default function DashboardScreen() {
     }, []),
   );
 
-  async function onEnablePhoneAlerts() {
-    await requestDeskNotificationPermission();
-    const next = await getDeskNotificationState();
-    setNotifAuth(next.authorized);
-    setNotifDenied(next.denied);
-  }
-
   const t = todayISO();
 
   const futureOrderRows = useMemo(() => {
     return orders
-      .map((o) => {
+      .map(o => {
         const received = sumPayments(o.clientPayments);
         const total = Number(o.totalAmount) || 0;
         const due = total - received;
         return { order: o, received, due, total };
       })
-      .filter((x) => isOrderFuture(x.order, t))
+      .filter(x => isOrderFuture(x.order, t))
       .sort((a, b) => {
-        const c = futureOrderSortKey(a.order).localeCompare(futureOrderSortKey(b.order));
+        const c = futureOrderSortKey(a.order).localeCompare(
+          futureOrderSortKey(b.order),
+        );
         if (c !== 0) return c;
         if (b.due !== a.due) return b.due - a.due;
         return (a.order.title || '').localeCompare(b.order.title || '');
@@ -116,7 +121,7 @@ export default function DashboardScreen() {
   );
 
   const visitBalances = useMemo(() => {
-    return (fieldVisits || []).map((v) => {
+    return (fieldVisits || []).map(v => {
       const received = sumPayments(v.collections);
       const total = Number(v.amountToCollect) || 0;
       return { v, received, due: total - received };
@@ -132,32 +137,51 @@ export default function DashboardScreen() {
 
   const totalVisitDueNet = useMemo(
     () =>
-      netVisitPendingAfterStudioPay(orders, fieldVisits, (v, due) => due > 0 && isVisitFuture(v, t)),
+      netVisitPendingAfterStudioPay(
+        orders,
+        fieldVisits,
+        (v, due) => due > 0 && isVisitFuture(v, t),
+      ),
     [orders, fieldVisits, t],
   );
 
   const dashboardVisitRows = useMemo(() => {
-    const rows = visitBalances.filter(({ v, due }) => due > 0 && isVisitFuture(v, t));
+    const rows = visitBalances.filter(
+      ({ v, due }) => due > 0 && isVisitFuture(v, t),
+    );
     rows.sort((a, b) => {
       const af = fieldVisitRange(a.v).from;
       const bf = fieldVisitRange(b.v).from;
-      return af.localeCompare(bf) || (a.v.time || '').localeCompare(b.v.time || '');
+      return (
+        af.localeCompare(bf) || (a.v.time || '').localeCompare(b.v.time || '')
+      );
     });
     return rows;
   }, [visitBalances, t]);
 
   const isFresh =
-    clients.length === 0 && orders.length === 0 && (fieldVisits || []).length === 0;
+    clients.length === 0 &&
+    orders.length === 0 &&
+    (fieldVisits || []).length === 0;
   const visitCount = (fieldVisits || []).length;
 
-  const settlementRows = useMemo(() => buildSettlementRows(orders, fieldVisits), [orders, fieldVisits]);
-  const settlementHint = useMemo(() => settlementNeedsLinkHint(settlementRows), [settlementRows]);
-  const profit = useMemo(() => computeStudioProfit(orders, fieldVisits), [orders, fieldVisits]);
+  const settlementRows = useMemo(
+    () => buildSettlementRows(orders, fieldVisits),
+    [orders, fieldVisits],
+  );
+  const settlementHint = useMemo(
+    () => settlementNeedsLinkHint(settlementRows),
+    [settlementRows],
+  );
+  const profit = useMemo(
+    () => computeStudioProfit(orders, fieldVisits),
+    [orders, fieldVisits],
+  );
 
   const tomorrowOrders = useMemo(() => {
     return orders
-      .filter((o) => orderEventStartsTomorrow(o, t))
-      .map((o) => ({
+      .filter(o => orderEventStartsTomorrow(o, t))
+      .map(o => ({
         order: o,
         client: clientById.get(o.clientId)?.name || '—',
         when: upcomingOrderWhenLabel(o),
@@ -166,8 +190,8 @@ export default function DashboardScreen() {
 
   const tomorrowVisits = useMemo(() => {
     return (fieldVisits || [])
-      .filter((v) => visitTouchesTomorrow(v, t))
-      .map((v) => {
+      .filter(v => visitTouchesTomorrow(v, t))
+      .map(v => {
         const { from, to } = fieldVisitRange(v);
         return { v, rangeLabel: formatDateRangeEn(from, to) };
       });
@@ -175,8 +199,8 @@ export default function DashboardScreen() {
 
   const pastDueOrders = useMemo(() => {
     return orders
-      .filter((o) => orderPastDueWithBalance(o, t))
-      .map((o) => {
+      .filter(o => orderPastDueWithBalance(o, t))
+      .map(o => {
         const received = sumPayments(o.clientPayments);
         const due = (Number(o.totalAmount) || 0) - received;
         return {
@@ -189,8 +213,57 @@ export default function DashboardScreen() {
       .sort((a, b) => b.due - a.due);
   }, [orders, clientById, t]);
 
+  const thisWeekRangeText = useMemo(() => {
+    const { weekStart, weekEnd } = calendarWeekRangeISO(t);
+    return formatDateRangeEn(weekStart, weekEnd);
+  }, [t]);
+
+  const thisWeekOrderRows = useMemo(() => {
+    const { weekStart, weekEnd } = calendarWeekRangeISO(t);
+    return orders
+      .filter(o => {
+        const r = orderEventRange(o);
+        if (r.from)
+          return rangeOverlapsWindow(
+            r.from,
+            r.to || r.from,
+            weekStart,
+            weekEnd,
+          );
+        const od = coerceDateFieldToISO(o.orderDate);
+        return od ? rangeOverlapsWindow(od, od, weekStart, weekEnd) : false;
+      })
+      .map(o => ({
+        order: o,
+        client: clientById.get(o.clientId)?.name || '—',
+        when: upcomingOrderWhenLabel(o),
+      }))
+      .sort((a, b) =>
+        futureOrderSortKey(a.order).localeCompare(futureOrderSortKey(b.order)),
+      );
+  }, [orders, clientById, t]);
+
+  const thisWeekVisitRows = useMemo(() => {
+    const { weekStart, weekEnd } = calendarWeekRangeISO(t);
+    return (fieldVisits || [])
+      .filter(v => {
+        const { from, to } = fieldVisitRange(v);
+        if (!from) return false;
+        return rangeOverlapsWindow(from, to || from, weekStart, weekEnd);
+      })
+      .map(v => {
+        const { from, to } = fieldVisitRange(v);
+        return { v, rangeLabel: formatDateRangeEn(from, to) };
+      })
+      .sort((a, b) =>
+        fieldVisitRange(a.v).from.localeCompare(fieldVisitRange(b.v).from),
+      );
+  }, [fieldVisits, t]);
+
   const hasReminders =
-    tomorrowOrders.length > 0 || tomorrowVisits.length > 0 || pastDueOrders.length > 0;
+    tomorrowOrders.length > 0 ||
+    tomorrowVisits.length > 0 ||
+    pastDueOrders.length > 0;
   const showReminderCard = !isFresh && (hasReminders || !notifAuth);
 
   return (
@@ -200,21 +273,18 @@ export default function DashboardScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.rowBetween}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Dashboard</Text>
-            <Text style={styles.panelLead}>
-              Dues, outside visits, and quick adds—at a glance.
+        <View style={styles.hero}>
+          <View style={styles.heroTop}>
+            <Text style={styles.title} accessibilityRole="header">
+              Dashboard
             </Text>
-            {user?.email ? (
-              <Text style={styles.email} numberOfLines={1}>
-                {user.email}
-              </Text>
-            ) : null}
+            <View style={styles.headerActions}>
+              <OpenDeskSearchButton variant="toolbar" />
+            </View>
           </View>
-          <TouchableOpacity style={styles.outBtn} onPress={() => logOut()}>
-            <Text style={styles.outBtnText}>Sign out</Text>
-          </TouchableOpacity>
+          <Text style={styles.panelLead}>
+            Dues, outside visits, and quick adds—at a glance.
+          </Text>
         </View>
 
         {syncError ? (
@@ -222,7 +292,6 @@ export default function DashboardScreen() {
             <Text style={styles.bannerErrText}>{syncError}</Text>
           </View>
         ) : null}
-        {cloudSync ? <Text style={styles.syncOk}>Synced with Firestore</Text> : null}
 
         <Text style={styles.sectionLabel}>Quick actions</Text>
         <View style={styles.quickActions}>
@@ -231,7 +300,9 @@ export default function DashboardScreen() {
             onPress={() => navigation.navigate('Clients')}
             activeOpacity={0.85}
           >
-            <Text style={styles.qaEmoji}>+</Text>
+            <View style={styles.qaEmojiWrap}>
+              <Text style={styles.qaEmoji}>+</Text>
+            </View>
             <View style={styles.qaTextWrap}>
               <Text style={styles.qaStrong}>New client</Text>
               <Text style={styles.qaSmall}>Save a name & phone</Text>
@@ -242,7 +313,9 @@ export default function DashboardScreen() {
             onPress={() => navigation.navigate('Orders')}
             activeOpacity={0.85}
           >
-            <Text style={styles.qaEmoji}>✦</Text>
+            <View style={styles.qaEmojiWrap}>
+              <Text style={styles.qaEmoji}>✦</Text>
+            </View>
             <View style={styles.qaTextWrap}>
               <Text style={styles.qaStrong}>New order</Text>
               <Text style={styles.qaSmall}>Quote & payments</Text>
@@ -253,7 +326,9 @@ export default function DashboardScreen() {
             onPress={() => navigation.navigate('Field')}
             activeOpacity={0.85}
           >
-            <Text style={styles.qaEmoji}>⌖</Text>
+            <View style={styles.qaEmojiWrap}>
+              <Text style={styles.qaEmoji}>⌖</Text>
+            </View>
             <View style={styles.qaTextWrap}>
               <Text style={styles.qaStrong}>My Exposing</Text>
               <Text style={styles.qaSmall}>Where to go & collect</Text>
@@ -261,26 +336,99 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
+        {!isFresh &&
+        (thisWeekOrderRows.length > 0 || thisWeekVisitRows.length > 0) ? (
+          <View style={styles.weekCard}>
+            <Text style={styles.weekTitle}>This week</Text>
+            <Text style={styles.weekRange}>{thisWeekRangeText}</Text>
+            <Text style={styles.weekLead}>
+              Mon–Sun: jobs and visits that touch these dates.
+            </Text>
+            {thisWeekOrderRows.length > 0 ? (
+              <View style={styles.weekBlock}>
+                <Text style={styles.weekBlockTitle}>Orders</Text>
+                {thisWeekOrderRows.map(({ order, client, when }) => (
+                  <TouchableOpacity
+                    key={order.id}
+                    style={styles.weekRow}
+                    onPress={() =>
+                      navigation.navigate('Orders', {
+                        screen: 'OrderDetail',
+                        params: { orderId: order.id },
+                      })
+                    }
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.weekRowMain}>{order.title}</Text>
+                      <Text style={styles.weekRowMuted}>{client}</Text>
+                    </View>
+                    {when ? (
+                      <Text style={styles.weekRowMeta}>{when}</Text>
+                    ) : null}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+            {thisWeekVisitRows.length > 0 ? (
+              <View style={styles.weekBlock}>
+                <Text style={styles.weekBlockTitle}>My Exposing</Text>
+                {thisWeekVisitRows.map(({ v, rangeLabel }) => (
+                  <TouchableOpacity
+                    key={v.id}
+                    style={styles.weekRow}
+                    onPress={() =>
+                      navigation.navigate('Field', { highlightVisitId: v.id })
+                    }
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.weekRowMain}>{v.hostName}</Text>
+                      {v.venue ? (
+                        <Text style={styles.weekRowMuted}>{v.venue}</Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.weekRowMeta}>{rangeLabel}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
         {showReminderCard ? (
           <View style={styles.reminderCard}>
             <Text style={styles.reminderTitle}>Reminders</Text>
             {!notifAuth ? (
               <View style={styles.reminderNotifBlock}>
-                <TouchableOpacity style={styles.reminderNotifBtn} onPress={onEnablePhoneAlerts}>
-                  <Text style={styles.reminderNotifBtnText}>Turn on phone alerts</Text>
+                <TouchableOpacity
+                  style={styles.reminderSettingsCta}
+                  onPress={() => navigateToDeskSettings(navigation)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.reminderSettingsCtaTitle}>Desk alerts are off</Text>
+                  <Text style={styles.reminderSettingsCtaSub}>
+                    Open Settings to turn on reminders for tomorrow&apos;s jobs and overdue payments.
+                  </Text>
                 </TouchableOpacity>
                 {notifDenied ? (
-                  <TouchableOpacity onPress={() => Linking.openSettings()} style={styles.reminderSettingsWrap}>
-                    <Text style={styles.reminderSettingsLink}>Notifications blocked — open system settings</Text>
+                  <TouchableOpacity
+                    onPress={() => Linking.openSettings()}
+                    style={styles.reminderSettingsWrap}
+                  >
+                    <Text style={styles.reminderSettingsLink}>
+                      Notifications blocked — open system settings
+                    </Text>
                   </TouchableOpacity>
                 ) : null}
-                <Text style={styles.reminderNotifHelp}>
-                  We will notify you about tomorrow's jobs and overdue payments (same limits as the web app: up
-                  to five per type per day, spaced out).
-                </Text>
               </View>
             ) : (
-              <Text style={styles.reminderOk}>Phone alerts on</Text>
+              <TouchableOpacity
+                style={styles.reminderOkRow}
+                onPress={() => navigateToDeskSettings(navigation)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.reminderOk}>Phone alerts on</Text>
+                <Text style={styles.reminderOkHint}>Settings →</Text>
+              </TouchableOpacity>
             )}
             <Text style={styles.reminderLead}>
               Jobs and balances that need attention soon.
@@ -288,7 +436,8 @@ export default function DashboardScreen() {
             {tomorrowOrders.length > 0 ? (
               <View style={styles.reminderBlock}>
                 <Text style={styles.reminderBlockTitle}>
-                  Tomorrow ({formatDateRangeEn(addDaysISO(t, 1), addDaysISO(t, 1))})
+                  Tomorrow (
+                  {formatDateRangeEn(addDaysISO(t, 1), addDaysISO(t, 1))})
                 </Text>
                 {tomorrowOrders.map(({ order, client, when }) => (
                   <TouchableOpacity
@@ -300,14 +449,18 @@ export default function DashboardScreen() {
                       <Text style={styles.reminderMain}>{order.title}</Text>
                       <Text style={styles.reminderMuted}>{client}</Text>
                     </View>
-                    {when ? <Text style={styles.reminderMeta}>{when}</Text> : null}
+                    {when ? (
+                      <Text style={styles.reminderMeta}>{when}</Text>
+                    ) : null}
                   </TouchableOpacity>
                 ))}
               </View>
             ) : null}
             {tomorrowVisits.length > 0 ? (
               <View style={styles.reminderBlock}>
-                <Text style={styles.reminderBlockTitle}>My exposing tomorrow</Text>
+                <Text style={styles.reminderBlockTitle}>
+                  My exposing tomorrow
+                </Text>
                 {tomorrowVisits.map(({ v, rangeLabel }) => (
                   <TouchableOpacity
                     key={v.id}
@@ -316,7 +469,9 @@ export default function DashboardScreen() {
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={styles.reminderMain}>{v.hostName}</Text>
-                      {v.venue ? <Text style={styles.reminderMuted}>{v.venue}</Text> : null}
+                      {v.venue ? (
+                        <Text style={styles.reminderMuted}>{v.venue}</Text>
+                      ) : null}
                     </View>
                     <Text style={styles.reminderMeta}>{rangeLabel}</Text>
                   </TouchableOpacity>
@@ -338,7 +493,9 @@ export default function DashboardScreen() {
                       <Text style={styles.reminderMain}>{order.title}</Text>
                       <Text style={styles.reminderMuted}>{client}</Text>
                     </View>
-                    <Text style={[styles.reminderMeta, styles.warnText]}>{formatINR(due)} due</Text>
+                    <Text style={[styles.reminderMeta, styles.warnText]}>
+                      {formatINR(due)} due
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -350,15 +507,17 @@ export default function DashboardScreen() {
           <View style={styles.welcome}>
             <Text style={styles.welcomeTitle}>Your desk is ready</Text>
             <Text style={styles.welcomeCopy}>
-              Add a client and an order for studio jobs—or open My Exposing for outside shoots (whose
-              place, what to collect).
+              Add a client and an order for studio jobs—or open My Exposing for
+              outside shoots (whose place, what to collect).
             </Text>
             <View style={styles.welcomeBtns}>
               <TouchableOpacity
                 style={styles.welcomeBtnPrimary}
                 onPress={() => navigation.navigate('Clients')}
               >
-                <Text style={styles.welcomeBtnPrimaryText}>Start with a client</Text>
+                <Text style={styles.welcomeBtnPrimaryText}>
+                  Start with a client
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.welcomeBtnGhost}
@@ -400,7 +559,9 @@ export default function DashboardScreen() {
           </TouchableOpacity>
           <View style={[styles.statTile, styles.statTileStatic]}>
             <Text style={styles.statLabel}>Due (future jobs)</Text>
-            <Text style={[styles.statValue, styles.statMoney]}>{formatINR(totalClientDue)}</Text>
+            <Text style={[styles.statValue, styles.statMoney]}>
+              {formatINR(totalClientDue)}
+            </Text>
             <Text style={styles.statHint}>Orders not ended</Text>
           </View>
           <View style={[styles.statTile, styles.statTileStatic]}>
@@ -409,14 +570,19 @@ export default function DashboardScreen() {
               style={[
                 styles.statValue,
                 styles.statMoney,
-                profit.netEstimate > 0 ? styles.okText : profit.netEstimate < 0 ? styles.warnText : null,
+                profit.netEstimate > 0
+                  ? styles.okText
+                  : profit.netEstimate < 0
+                  ? styles.warnText
+                  : null,
               ]}
             >
               {formatINR(profit.netEstimate)}
             </Text>
             <Text style={styles.statHintSmall}>
-              Received {formatINR(profit.totalReceived)} − team {formatINR(profit.teamPayouts)} − guest pay
-              (net) {formatINR(profit.guestPayCommitted)}
+              Received {formatINR(profit.totalReceived)} − team{' '}
+              {formatINR(profit.teamPayouts)} − guest pay (net){' '}
+              {formatINR(profit.guestPayCommitted)}
               {profit.guestPayRaw > profit.guestPayCommitted
                 ? ` (was ${formatINR(profit.guestPayRaw)} before visit offset)`
                 : ''}
@@ -436,15 +602,17 @@ export default function DashboardScreen() {
                 Gross on visits {formatINR(totalVisitDueGross)}
               </Text>
             ) : null}
-            <Text style={styles.statHint}>Net after studio pay (same person)</Text>
+            <Text style={styles.statHint}>
+              Net after studio pay (same person)
+            </Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Upcoming orders</Text>
           <Text style={styles.cardSub}>
-            Future jobs on the calendar—shown even when fully paid; balance due when anything is left to
-            receive.
+            Future jobs on the calendar—shown even when fully paid; balance due
+            when anything is left to receive.
           </Text>
           {futureOrderRows.length === 0 ? (
             <View style={styles.emptyInner}>
@@ -473,21 +641,29 @@ export default function DashboardScreen() {
                     {whenLabel ? (
                       <Text style={styles.pillDate}>{whenLabel}</Text>
                     ) : (
-                      <Text style={styles.mutedSmall}>No event date — set in order</Text>
+                      <Text style={styles.mutedSmall}>
+                        No event date — set in order
+                      </Text>
                     )}
                     <Text style={styles.feedClient}>{cname}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end', maxWidth: '46%' }}>
                     {dueOutstanding > 0 ? (
-                      <Text style={styles.feedDue}>{formatINR(dueOutstanding)}</Text>
+                      <Text style={styles.feedDue}>
+                        {formatINR(dueOutstanding)}
+                      </Text>
                     ) : overpaid ? (
-                      <Text style={styles.feedOver}>Overpaid {formatINR(-due)}</Text>
+                      <Text style={styles.feedOver}>
+                        Overpaid {formatINR(-due)}
+                      </Text>
                     ) : (
                       <Text style={styles.feedPaid}>Paid up</Text>
                     )}
                     <Text style={styles.feedReceived}>
                       {total > 0
-                        ? `Total ${formatINR(total)} · Received ${formatINR(received)}`
+                        ? `Total ${formatINR(total)} · Received ${formatINR(
+                            received,
+                          )}`
                         : `Received ${formatINR(received)}`}
                     </Text>
                   </View>
@@ -499,12 +675,16 @@ export default function DashboardScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Visit collections</Text>
-          <Text style={styles.cardSub}>Upcoming shoots where you still need to collect.</Text>
+          <Text style={styles.cardSub}>
+            Upcoming shoots where you still need to collect.
+          </Text>
           {dashboardVisitRows.length === 0 ? (
             <View style={styles.emptyInner}>
               <Text style={styles.emptyIcon}>⌖</Text>
               <Text style={styles.emptyTitle}>No pending collections</Text>
-              <Text style={styles.emptyText}>Log My Exposing with an amount to see it here.</Text>
+              <Text style={styles.emptyText}>
+                Log My Exposing with an amount to see it here.
+              </Text>
               <TouchableOpacity
                 style={styles.emptyBtn}
                 onPress={() => navigation.navigate('Field')}
@@ -521,10 +701,14 @@ export default function DashboardScreen() {
                   <View key={v.id} style={styles.feedItemVisit}>
                     <View style={styles.visitWhenRow}>
                       <Text style={styles.pillDate}>{rangeLabel}</Text>
-                      {v.time ? <Text style={styles.mutedSmall}> · {v.time}</Text> : null}
+                      {v.time ? (
+                        <Text style={styles.mutedSmall}> · {v.time}</Text>
+                      ) : null}
                     </View>
                     <Text style={styles.visitHost}>{v.hostName}</Text>
-                    {v.venue ? <Text style={styles.mutedSmall}>{v.venue}</Text> : null}
+                    {v.venue ? (
+                      <Text style={styles.mutedSmall}>{v.venue}</Text>
+                    ) : null}
                     <View style={styles.visitDueRow}>
                       <Text style={styles.mutedSmall}>Still due</Text>
                       <Text style={due > 0 ? styles.feedDue : styles.feedPaid}>
@@ -547,12 +731,13 @@ export default function DashboardScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Same-person net</Text>
           <Text style={styles.cardSub}>
-            Field due minus studio Pay them when it's the same contact (name or Match key).
+            Field due minus studio Pay them when it's the same contact (name or
+            Match key).
           </Text>
           {settlementHint ? (
             <Text style={styles.settleHint}>
-              Studio pay and visit money both exist, but nothing linked—use the same Match key on the guest
-              and the visit (or similar names).
+              Studio pay and visit money both exist, but nothing linked—use the
+              same Match key on the guest and the visit (or similar names).
             </Text>
           ) : null}
           {settlementRows.length === 0 ? (
@@ -560,7 +745,8 @@ export default function DashboardScreen() {
               <Text style={styles.emptyIcon}>⇄</Text>
               <Text style={styles.emptyTitle}>No offsets yet</Text>
               <Text style={styles.emptyText}>
-                Add Pay them on an exposure guest and My Exposing for the same person.
+                Add Pay them on an exposure guest and My Exposing for the same
+                person.
               </Text>
             </View>
           ) : (
@@ -571,21 +757,30 @@ export default function DashboardScreen() {
                 <Text style={styles.th}>Due (visit)</Text>
                 <Text style={styles.th}>Net</Text>
               </View>
-              {settlementRows.map((r) => (
+              {settlementRows.map(r => (
                 <View
                   key={r.key}
-                  style={[styles.tableRow, r.hasBothSides ? styles.tableRowNet : null]}
+                  style={[
+                    styles.tableRow,
+                    r.hasBothSides ? styles.tableRowNet : null,
+                  ]}
                 >
                   <Text style={[styles.td, styles.thPerson]} numberOfLines={3}>
                     {r.label}
                   </Text>
-                  <Text style={styles.td}>{r.payToGuest > 0 ? formatINR(r.payToGuest) : '—'}</Text>
-                  <Text style={styles.td}>{r.collectDue > 0 ? formatINR(r.collectDue) : '—'}</Text>
+                  <Text style={styles.td}>
+                    {r.payToGuest > 0 ? formatINR(r.payToGuest) : '—'}
+                  </Text>
+                  <Text style={styles.td}>
+                    {r.collectDue > 0 ? formatINR(r.collectDue) : '—'}
+                  </Text>
                   <View style={styles.td}>
                     {r.net === 0 && r.hasBothSides ? (
                       <Text style={styles.okText}>Even</Text>
                     ) : r.net > 0 ? (
-                      <Text style={styles.warnText}>Collect {formatINR(r.net)}</Text>
+                      <Text style={styles.warnText}>
+                        Collect {formatINR(r.net)}
+                      </Text>
                     ) : r.net < 0 ? (
                       <Text>Pay {formatINR(-r.net)}</Text>
                     ) : (
@@ -606,20 +801,84 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 32 },
-  rowBetween: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12, gap: 8 },
-  title: { fontSize: 24, fontWeight: '800', color: colors.text, letterSpacing: -0.5 },
-  panelLead: { fontSize: 14, color: colors.muted, marginTop: 6, lineHeight: 20, maxWidth: 280 },
-  email: { fontSize: 13, color: colors.muted, marginTop: 4 },
-  outBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surfaceSolid,
-    alignSelf: 'flex-start',
+  hero: {
+    marginBottom: 18,
   },
-  outBtnText: { color: colors.muted, fontSize: 14, fontWeight: '600' },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 8,
+  },
+  title: {
+    flex: 1,
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.text,
+    letterSpacing: -0.6,
+    lineHeight: 32,
+  },
+  panelLead: {
+    fontSize: 14,
+    color: colors.muted,
+    lineHeight: 21,
+    marginBottom: 10,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 0,
+  },
+  weekCard: {
+    backgroundColor: colors.surfaceSolid,
+    borderRadius: radius.md,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#14121f',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+      },
+      android: { elevation: 1 },
+    }),
+  },
+  weekTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
+  weekRange: { fontSize: 13, color: colors.muted, marginTop: 4 },
+  weekLead: {
+    fontSize: 12,
+    color: colors.muted,
+    marginTop: 8,
+    marginBottom: 10,
+    lineHeight: 17,
+  },
+  weekBlock: { marginTop: 4, marginBottom: 8 },
+  weekBlockTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.primary,
+    marginBottom: 8,
+  },
+  weekRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  weekRowMain: { fontSize: 15, fontWeight: '600', color: colors.text },
+  weekRowMuted: { fontSize: 13, color: colors.muted, marginTop: 2 },
+  weekRowMeta: {
+    fontSize: 12,
+    color: colors.muted,
+    maxWidth: '38%',
+    textAlign: 'right',
+  },
   bannerErr: {
     backgroundColor: colors.syncErrorBg,
     borderWidth: 1,
@@ -629,27 +888,50 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   bannerErrText: { color: colors.syncErrorText, fontSize: 14, lineHeight: 20 },
-  syncOk: { color: colors.success, fontSize: 13, marginBottom: 12 },
   sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.primary,
+    opacity: 0.85,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 8,
+    letterSpacing: 1,
+    marginBottom: 10,
+    marginTop: 2,
   },
-  quickActions: { gap: 10, marginBottom: 16 },
+  quickActions: { gap: 12, marginBottom: 18 },
   qaBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    backgroundColor: colors.card,
+    gap: 14,
+    backgroundColor: colors.surfaceSolid,
     borderRadius: radius.md,
-    padding: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.inputBorder,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#14121f',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+    }),
   },
-  qaEmoji: { fontSize: 22, color: colors.primary, width: 28, textAlign: 'center' },
+  qaEmojiWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: colors.chipOnBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qaEmoji: {
+    fontSize: 22,
+    color: colors.primary,
+    textAlign: 'center',
+  },
   qaTextWrap: { flex: 1 },
   qaStrong: { fontSize: 16, fontWeight: '700', color: colors.text },
   qaSmall: { fontSize: 13, color: colors.muted, marginTop: 2 },
@@ -663,22 +945,63 @@ const styles = StyleSheet.create({
   },
   reminderTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
   reminderNotifBlock: { marginBottom: 10 },
-  reminderNotifBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  reminderSettingsCta: {
+    backgroundColor: colors.secondaryPillBg,
     borderRadius: radius.sm,
-    marginTop: 6,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  reminderNotifBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  reminderSettingsWrap: { marginTop: 10 },
-  reminderSettingsLink: { fontSize: 13, fontWeight: '600', color: colors.primary, textDecorationLine: 'underline' },
-  reminderNotifHelp: { fontSize: 12, color: colors.muted, marginTop: 10, lineHeight: 17 },
-  reminderOk: { fontSize: 13, fontWeight: '600', color: colors.success, marginTop: 6, marginBottom: 4 },
-  reminderLead: { fontSize: 13, color: colors.muted, marginTop: 8, marginBottom: 12 },
+  reminderSettingsCtaTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  reminderSettingsCtaSub: {
+    fontSize: 13,
+    color: colors.muted,
+    marginTop: 6,
+    lineHeight: 19,
+  },
+  reminderSettingsWrap: { marginTop: 12 },
+  reminderSettingsLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+    textDecorationLine: 'underline',
+  },
+  reminderOkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    marginBottom: 8,
+    gap: 8,
+  },
+  reminderOk: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.success,
+    flex: 1,
+  },
+  reminderOkHint: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  reminderLead: {
+    fontSize: 13,
+    color: colors.muted,
+    marginTop: 8,
+    marginBottom: 12,
+  },
   reminderBlock: { marginBottom: 12 },
-  reminderBlockTitle: { fontSize: 14, fontWeight: '800', color: colors.primary, marginBottom: 8 },
+  reminderBlockTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.primary,
+    marginBottom: 8,
+  },
   reminderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -688,7 +1011,13 @@ const styles = StyleSheet.create({
   },
   reminderMain: { fontSize: 15, fontWeight: '600', color: colors.text },
   reminderMuted: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  reminderMeta: { fontSize: 12, color: colors.muted, marginLeft: 8, maxWidth: 120, textAlign: 'right' },
+  reminderMeta: {
+    fontSize: 12,
+    color: colors.muted,
+    marginLeft: 8,
+    maxWidth: 120,
+    textAlign: 'right',
+  },
   warnText: { color: colors.warn, fontWeight: '600' },
   okText: { color: colors.success, fontWeight: '600' },
   welcome: {
@@ -700,8 +1029,18 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   welcomeTitle: { fontSize: 20, fontWeight: '800', color: colors.text },
-  welcomeCopy: { fontSize: 14, color: colors.muted, marginTop: 8, lineHeight: 21 },
-  welcomeBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
+  welcomeCopy: {
+    fontSize: 14,
+    color: colors.muted,
+    marginTop: 8,
+    lineHeight: 21,
+  },
+  welcomeBtns: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 14,
+  },
   welcomeBtnPrimary: {
     backgroundColor: colors.primary,
     paddingHorizontal: 16,
@@ -718,7 +1057,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSolid,
   },
   welcomeBtnGhostText: { color: colors.text, fontWeight: '600', fontSize: 15 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 16,
+  },
   statTile: {
     width: '48%',
     backgroundColor: colors.card,
@@ -729,10 +1073,20 @@ const styles = StyleSheet.create({
   },
   statTileStatic: { opacity: 1 },
   statLabel: { fontSize: 12, color: colors.muted },
-  statValue: { fontSize: 20, fontWeight: '800', color: colors.text, marginTop: 4 },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.text,
+    marginTop: 4,
+  },
   statMoney: { fontSize: 17 },
   statHint: { fontSize: 11, color: colors.muted, marginTop: 6 },
-  statHintSmall: { fontSize: 10, color: colors.muted, marginTop: 6, lineHeight: 14 },
+  statHintSmall: {
+    fontSize: 10,
+    color: colors.muted,
+    marginTop: 6,
+    lineHeight: 14,
+  },
   statGrossNote: { fontSize: 11, color: colors.muted, marginTop: 4 },
   card: {
     backgroundColor: colors.card,
@@ -747,7 +1101,13 @@ const styles = StyleSheet.create({
   emptyInner: { alignItems: 'center', paddingVertical: 20 },
   emptyIcon: { fontSize: 28, marginBottom: 8 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
-  emptyText: { fontSize: 13, color: colors.muted, textAlign: 'center', marginTop: 6, paddingHorizontal: 12 },
+  emptyText: {
+    fontSize: 13,
+    color: colors.muted,
+    textAlign: 'center',
+    marginTop: 6,
+    paddingHorizontal: 12,
+  },
   emptyBtn: {
     marginTop: 14,
     backgroundColor: colors.primary,
@@ -783,14 +1143,28 @@ const styles = StyleSheet.create({
   feedDue: { fontSize: 15, fontWeight: '800', color: colors.warn },
   feedOver: { fontSize: 13, fontWeight: '600', color: colors.success },
   feedPaid: { fontSize: 13, fontWeight: '600', color: colors.success },
-  feedReceived: { fontSize: 11, color: colors.muted, marginTop: 4, textAlign: 'right' },
+  feedReceived: {
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: 4,
+    textAlign: 'right',
+  },
   feedItemVisit: {
     paddingVertical: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-  visitWhenRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
-  visitHost: { fontSize: 16, fontWeight: '700', color: colors.text, marginTop: 6 },
+  visitWhenRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+  },
+  visitHost: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: 6,
+  },
   visitDueRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -821,7 +1195,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   tableRowNet: { backgroundColor: colors.chipOnBg },
-  th: { flex: 1, fontSize: 10, fontWeight: '700', color: colors.muted, textTransform: 'uppercase' },
+  th: {
+    flex: 1,
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.muted,
+    textTransform: 'uppercase',
+  },
   thPerson: { flex: 1.4 },
   td: { flex: 1, fontSize: 12, color: colors.text, paddingRight: 4 },
 });

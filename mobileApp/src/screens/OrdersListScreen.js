@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import OpenDeskSearchButton from '../components/OpenDeskSearchButton';
 import { useStudio } from '../context/StudioContext';
 import {
   coerceDateFieldToISO,
@@ -30,8 +31,10 @@ function orderSortKey(o) {
 
 export default function OrdersListScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const scrollRef = useRef(null);
   const titleRef = useRef(null);
+  const rowYRef = useRef({});
   const { orders, clients, clientById, addOrder } = useStudio();
 
   const [newClientId, setNewClientId] = useState('');
@@ -43,6 +46,31 @@ export default function OrdersListScreen() {
   const [newEventFrom, setNewEventFrom] = useState('');
   const [newEventTo, setNewEventTo] = useState('');
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
+  const [pulseOrderId, setPulseOrderId] = useState(null);
+
+  const highlightOrderId = route.params?.highlightOrderId;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!highlightOrderId) return undefined;
+      setPulseOrderId(highlightOrderId);
+      const tScroll = setTimeout(() => {
+        const y = rowYRef.current[highlightOrderId];
+        if (y != null) {
+          scrollRef.current?.scrollTo({ y: Math.max(0, y - 24), animated: true });
+        }
+      }, 180);
+      const tClearPulse = setTimeout(() => setPulseOrderId(null), 2200);
+      const tClearParam = setTimeout(() => {
+        navigation.setParams({ highlightOrderId: undefined });
+      }, 80);
+      return () => {
+        clearTimeout(tScroll);
+        clearTimeout(tClearPulse);
+        clearTimeout(tClearParam);
+      };
+    }, [highlightOrderId, navigation]),
+  );
 
   const sorted = useMemo(
     () =>
@@ -113,17 +141,20 @@ export default function OrdersListScreen() {
               functions (e.g. wedding), and client payments.
             </Text>
           </View>
-          {clients.length > 0 ? (
-            <TouchableOpacity
-              style={showNewOrderForm ? styles.headerBtnGhost : styles.headerBtnPrimary}
-              onPress={() => (showNewOrderForm ? closeNewOrderForm() : setShowNewOrderForm(true))}
-              activeOpacity={0.85}
-            >
-              <Text style={showNewOrderForm ? styles.headerBtnGhostText : styles.headerBtnPrimaryText}>
-                {showNewOrderForm ? 'Close' : '+ New'}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
+          <View style={styles.headActions}>
+            <OpenDeskSearchButton />
+            {clients.length > 0 ? (
+              <TouchableOpacity
+                style={showNewOrderForm ? styles.headerBtnGhost : styles.headerBtnPrimary}
+                onPress={() => (showNewOrderForm ? closeNewOrderForm() : setShowNewOrderForm(true))}
+                activeOpacity={0.85}
+              >
+                <Text style={showNewOrderForm ? styles.headerBtnGhostText : styles.headerBtnPrimaryText}>
+                  {showNewOrderForm ? 'Close' : '+ New'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
 
         {!clients.length ? (
@@ -249,7 +280,14 @@ export default function OrdersListScreen() {
           return (
             <TouchableOpacity
               key={o.id}
-              style={[styles.jobCard, styles.jobCardTouchable]}
+              style={[
+                styles.jobCard,
+                styles.jobCardTouchable,
+                pulseOrderId === o.id && styles.jobCardPulse,
+              ]}
+              onLayout={(e) => {
+                rowYRef.current[o.id] = e.nativeEvent.layout.y;
+              }}
               onPress={() => navigation.navigate('OrderDetail', { orderId: o.id })}
               activeOpacity={0.85}
             >
@@ -289,6 +327,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headTextCol: { flex: 1, minWidth: 0 },
+  headActions: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginTop: 4 },
   title: { fontSize: 26, fontWeight: '800', color: colors.text, letterSpacing: -0.4 },
   lead: { fontSize: 14, color: colors.muted, marginTop: 10, lineHeight: 21, maxWidth: 360 },
   leadStrong: { color: colors.text, fontWeight: '600' },
@@ -437,6 +476,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   jobCardTouchable: { alignSelf: 'stretch' },
+  jobCardPulse: {
+    borderColor: colors.primary,
+    borderWidth: 2,
+    backgroundColor: colors.accentSoft,
+  },
   jobTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
   jobMeta: { fontSize: 13, color: colors.muted, marginTop: 4 },
   warn: { color: colors.warn, fontWeight: '700' },

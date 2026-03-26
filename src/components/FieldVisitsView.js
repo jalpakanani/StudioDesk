@@ -1,10 +1,12 @@
-import {useMemo, useState} from 'react'
+import {useEffect, useMemo, useState} from 'react'
 import {useStudio} from '../context/StudioContext'
+import {useTab} from '../context/TabContext'
 import {formatINR, sumPayments} from '../utils/money'
 import {fieldVisitRange, formatDateRangeEn, formatISODateDisplay} from '../utils/dateRange'
 import {groupedFieldVisitCardStats} from '../utils/settlement'
 
 export default function FieldVisitsView() {
+  const {navFocus, clearNavFocus} = useTab()
   const {
     orders,
     fieldVisits,
@@ -51,6 +53,23 @@ export default function FieldVisitsView() {
     () => groupedFieldVisitCardStats(fieldVisits, orders),
     [fieldVisits, orders],
   )
+
+  useEffect(() => {
+    if (!navFocus || navFocus.kind !== 'visit') return
+    const id = navFocus.id
+    const list = fieldVisits || []
+    if (!list.some(v => v.id === id)) {
+      clearNavFocus()
+      return
+    }
+    clearNavFocus()
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`desk-visit-${id}`)
+      el?.scrollIntoView({behavior: 'smooth', block: 'nearest'})
+      el?.classList.add('desk-flash')
+      window.setTimeout(() => el?.classList.remove('desk-flash'), 2000)
+    })
+  }, [navFocus, fieldVisits, clearNavFocus])
 
   function submitNew(e) {
     e.preventDefault()
@@ -258,7 +277,7 @@ export default function FieldVisitsView() {
             const due = card.due
             const {from, to} = fieldVisitRange(v)
             return (
-              <li key={v.id} className="visit-card">
+              <li key={v.id} id={`desk-visit-${v.id}`} className="visit-card">
                 {editingId === v.id ? (
                   <form className="form-grid tight" onSubmit={saveEdit}>
                     <label>

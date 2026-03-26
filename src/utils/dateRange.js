@@ -55,6 +55,31 @@ export function rangeOverlapsWindow(aFrom, aTo, winFrom, winTo) {
   return aFrom <= winTo && aEnd >= winFrom;
 }
 
+/** Add calendar days to `YYYY-MM-DD` in the local timezone (noon anchor). */
+export function addCalendarDaysISO(isoDate, deltaDays) {
+  const d = new Date(`${isoDate}T12:00:00`);
+  d.setDate(d.getDate() + deltaDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/** Monday–Sunday bounds for the calendar week that contains `todayISO`. */
+export function calendarWeekRangeISO(todayISO) {
+  const d = new Date(`${todayISO}T12:00:00`);
+  const dow = d.getDay();
+  const offsetToMonday = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + offsetToMonday);
+  const y = monday.getFullYear();
+  const m = String(monday.getMonth() + 1).padStart(2, '0');
+  const day = String(monday.getDate()).padStart(2, '0');
+  const weekStart = `${y}-${m}-${day}`;
+  const weekEnd = addCalendarDaysISO(weekStart, 6);
+  return { weekStart, weekEnd };
+}
+
 /**
  * Any supported stored value → `DD/MM/YYYY` (not locale-based).
  */

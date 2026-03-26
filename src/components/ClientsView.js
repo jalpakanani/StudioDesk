@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useStudio } from '../context/StudioContext';
 import { useTab } from '../context/TabContext';
 
 export default function ClientsView() {
   const { clients, addClient, updateClient, removeClient } = useStudio();
-  const { setTab } = useTab();
+  const { setTab, navFocus, clearNavFocus } = useTab();
   const nameRef = useRef(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -13,6 +13,22 @@ export default function ClientsView() {
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editNotes, setEditNotes] = useState('');
+
+  useEffect(() => {
+    if (!navFocus || navFocus.kind !== 'client') return;
+    const id = navFocus.id;
+    if (!clients.some((c) => c.id === id)) {
+      clearNavFocus();
+      return;
+    }
+    clearNavFocus();
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`desk-client-${id}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      el?.classList.add('desk-flash');
+      window.setTimeout(() => el?.classList.remove('desk-flash'), 2000);
+    });
+  }, [navFocus, clients, clearNavFocus]);
 
   function submitNew(e) {
     e.preventDefault();
@@ -92,61 +108,74 @@ export default function ClientsView() {
       </div>
 
       {clients.length > 0 ? (
-        <p className="muted small" style={{ marginBottom: '0.65rem' }}>
-          {clients.length} client{clients.length === 1 ? '' : 's'} ·{' '}
-          <button type="button" className="btn-link" onClick={() => setTab('orders')}>
-            Create an order →
-          </button>
-        </p>
-      ) : null}
-
-      <ul className="table-list">
-        {clients.length === 0 && <li className="muted">Your roster will show up here.</li>}
-        {clients.map((c) => (
-          <li key={c.id}>
-            {editingId === c.id ? (
-              <form className="inline-edit" onSubmit={saveEdit}>
-                <input value={editName} onChange={(e) => setEditName(e.target.value)} required />
-                <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
-                <input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
-                <button type="submit" className="btn small primary">
-                  Save
-                </button>
-                <button type="button" className="btn small" onClick={() => setEditingId(null)}>
-                  Cancel
-                </button>
-              </form>
-            ) : (
-              <div className="table-row">
-                <div>
-                  <strong>{c.name}</strong>
-                  {c.phone ? <span className="muted"> · {c.phone}</span> : null}
-                  {c.notes ? <div className="muted small">{c.notes}</div> : null}
-                </div>
-                <div className="row-actions">
-                  <button type="button" className="btn small" onClick={() => startEdit(c)}>
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    className="btn small danger"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `Delete ${c.name}? All orders linked to this client will be removed.`
-                        )
-                      )
-                        removeClient(c.id);
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
+        <section className="glass-panel clients-roster-panel">
+          <div className="clients-roster-head">
+            <div>
+              <h3 className="glass-panel-title clients-roster-title">Saved clients</h3>
+              <p className="clients-roster-lead muted small">
+                {clients.length} on file — used when you book orders and log payments.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn primary btn-sm shine clients-roster-cta"
+              onClick={() => setTab('orders')}
+            >
+              New order
+            </button>
+          </div>
+          <ul className="table-list clients-roster-list">
+            {clients.map((c) => (
+              <li key={c.id} id={`desk-client-${c.id}`}>
+                {editingId === c.id ? (
+                  <form className="inline-edit" onSubmit={saveEdit}>
+                    <input value={editName} onChange={(e) => setEditName(e.target.value)} required />
+                    <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
+                    <input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+                    <button type="submit" className="btn small primary">
+                      Save
+                    </button>
+                    <button type="button" className="btn small" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </button>
+                  </form>
+                ) : (
+                  <div className="table-row">
+                    <div>
+                      <strong>{c.name}</strong>
+                      {c.phone ? <span className="muted"> · {c.phone}</span> : null}
+                      {c.notes ? <div className="muted small">{c.notes}</div> : null}
+                    </div>
+                    <div className="row-actions">
+                      <button type="button" className="btn small" onClick={() => startEdit(c)}>
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="btn small danger"
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Delete ${c.name}? All orders linked to this client will be removed.`
+                            )
+                          )
+                            removeClient(c.id);
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : (
+        <ul className="table-list">
+          <li className="muted">Your roster will show up here.</li>
+        </ul>
+      )}
     </div>
   );
 }

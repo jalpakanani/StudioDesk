@@ -1,11 +1,11 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStudio } from '../context/StudioContext';
 import { useTab } from '../context/TabContext';
 import { formatINR, sumPayments } from '../utils/money';
 import { formatDateRangeEn, formatISODateDisplay, orderEventRange } from '../utils/dateRange';
 
 export default function OrdersView() {
-  const { setTab } = useTab();
+  const { setTab, navFocus, clearNavFocus } = useTab();
   const titleRef = useRef(null);
   const {
     orders,
@@ -30,6 +30,23 @@ export default function OrdersView() {
   const [newEventTo, setNewEventTo] = useState('');
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) || null, [orders, selectedId]);
+
+  useEffect(() => {
+    if (!navFocus || navFocus.kind !== 'order') return;
+    const id = navFocus.id;
+    if (!orders.some((o) => o.id === id)) {
+      clearNavFocus();
+      return;
+    }
+    setSelectedId(id);
+    clearNavFocus();
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`order-pick-${id}`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      el?.classList.add('desk-flash');
+      window.setTimeout(() => el?.classList.remove('desk-flash'), 2000);
+    });
+  }, [navFocus, orders, clearNavFocus]);
 
   function submitOrder(e) {
     e.preventDefault();
@@ -169,6 +186,7 @@ export default function OrdersView() {
               return (
                 <li key={o.id}>
                   <button
+                    id={`order-pick-${o.id}`}
                     type="button"
                     className={`pick ${selectedId === o.id ? 'active' : ''}`}
                     onClick={() => setSelectedId(o.id)}

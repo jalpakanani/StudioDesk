@@ -3,10 +3,12 @@ import {useStudio} from '../context/StudioContext'
 import {useTab} from '../context/TabContext'
 import {formatINR, sumPayments} from '../utils/money'
 import {
+  calendarWeekRangeISO,
   coerceDateFieldToISO,
   fieldVisitRange,
   formatDateRangeEn,
   orderEventRange,
+  rangeOverlapsWindow,
 } from '../utils/dateRange'
 import {
   buildSettlementRows,
@@ -63,7 +65,7 @@ function upcomingOrderWhenLabel(order) {
 
 export default function Dashboard() {
   const {orders, clients, clientById, fieldVisits} = useStudio()
-  const {setTab} = useTab()
+  const {setTab, setNavFocus} = useTab()
   const [notifPerm, setNotifPerm] = useState(() =>
     typeof Notification !== 'undefined' ? Notification.permission : 'denied',
   )
@@ -178,6 +180,44 @@ export default function Dashboard() {
       })
   }, [fieldVisits])
 
+  const thisWeekOrderRows = useMemo(() => {
+    const t = todayISO()
+    const {weekStart, weekEnd} = calendarWeekRangeISO(t)
+    return orders
+      .filter(o => {
+        const r = orderEventRange(o)
+        if (r.from) return rangeOverlapsWindow(r.from, r.to || r.from, weekStart, weekEnd)
+        const od = coerceDateFieldToISO(o.orderDate)
+        return od ? rangeOverlapsWindow(od, od, weekStart, weekEnd) : false
+      })
+      .map(o => ({
+        order: o,
+        client: clientById.get(o.clientId)?.name || '—',
+        when: upcomingOrderWhenLabel(o),
+      }))
+      .sort((a, b) =>
+        futureOrderSortKey(a.order).localeCompare(futureOrderSortKey(b.order)),
+      )
+  }, [orders, clientById])
+
+  const thisWeekVisitRows = useMemo(() => {
+    const t = todayISO()
+    const {weekStart, weekEnd} = calendarWeekRangeISO(t)
+    return (fieldVisits || [])
+      .filter(v => {
+        const {from, to} = fieldVisitRange(v)
+        if (!from) return false
+        return rangeOverlapsWindow(from, to || from, weekStart, weekEnd)
+      })
+      .map(v => {
+        const {from, to} = fieldVisitRange(v)
+        return {v, rangeLabel: formatDateRangeEn(from, to)}
+      })
+      .sort((a, b) =>
+        fieldVisitRange(a.v).from.localeCompare(fieldVisitRange(b.v).from),
+      )
+  }, [fieldVisits])
+
   const pastDueOrders = useMemo(() => {
     const t = todayISO()
     return orders
@@ -206,6 +246,10 @@ export default function Dashboard() {
 
   const showReminderCard =
     !isFresh && (hasReminders || notifPerm === 'default')
+
+  const tWeek = todayISO()
+  const {weekStart: weekStartISO, weekEnd: weekEndISO} = calendarWeekRangeISO(tWeek)
+  const thisWeekRangeText = formatDateRangeEn(weekStartISO, weekEndISO)
 
   return (
     <div className="panel">
@@ -259,6 +303,71 @@ export default function Dashboard() {
           </span>
         </button>
       </div>
+
+      {!isFresh &&
+      (thisWeekOrderRows.length > 0 || thisWeekVisitRows.length > 0) ? (
+        <section className="card dash-week-snapshot" aria-label="This week">
+          <div className="dash-week-head">
+            <h3 className="dash-week-title">This week</h3>
+            <p className="dash-week-range muted small">{thisWeekRangeText}</p>
+          </div>
+          <p className="dash-week-lead muted small">
+            Calendar week (Mon–Sun): jobs and outside visits that touch these dates.
+          </p>
+          {thisWeekOrderRows.length > 0 ? (
+            <div className="dash-week-block">
+              <h4 className="dash-week-block-title">Orders</h4>
+              <ul className="dash-reminder-list">
+                {thisWeekOrderRows.map(({order, client, when}) => (
+                  <li key={order.id}>
+                    <button
+                      type="button"
+                      className="dash-reminder-row"
+                      onClick={() => {
+                        setNavFocus({kind: 'order', id: order.id})
+                        setTab('orders')
+                      }}
+                    >
+                      <span className="dash-reminder-main">
+                        <strong>{order.title}</strong>
+                        <span className="muted small">{client}</span>
+                      </span>
+                      <span className="dash-reminder-meta muted small">{when}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {thisWeekVisitRows.length > 0 ? (
+            <div className="dash-week-block">
+              <h4 className="dash-week-block-title">My Exposing</h4>
+              <ul className="dash-reminder-list">
+                {thisWeekVisitRows.map(({v, rangeLabel}) => (
+                  <li key={v.id}>
+                    <button
+                      type="button"
+                      className="dash-reminder-row"
+                      onClick={() => {
+                        setNavFocus({kind: 'visit', id: v.id})
+                        setTab('field')
+                      }}
+                    >
+                      <span className="dash-reminder-main">
+                        <strong>{v.hostName}</strong>
+                        {v.venue ? (
+                          <span className="muted small">{v.venue}</span>
+                        ) : null}
+                      </span>
+                      <span className="dash-reminder-meta muted small">{rangeLabel}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {showReminderCard ? (
         <section className="card dash-reminders" aria-label="Reminders">

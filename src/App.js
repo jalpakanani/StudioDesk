@@ -8,6 +8,7 @@ import ClientsView from './components/ClientsView';
 import OrdersView from './components/OrdersView';
 import FieldVisitsView from './components/FieldVisitsView';
 import BackupBar from './components/BackupBar';
+import GlobalSearch from './components/GlobalSearch';
 import LoginScreen from './components/LoginScreen';
 
 const TABS = [
@@ -54,6 +55,9 @@ function Shell() {
                 <h1>My Studio Desk</h1>
                 <p className="tagline">Orders &amp; payments · My Exposing &amp; collections</p>
               </div>
+            </div>
+            <div className="header-tools">
+              <GlobalSearch />
             </div>
             {auth.firebaseEnabled && auth.user ? (
               <div className="header-auth">

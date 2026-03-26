@@ -1,10 +1,15 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 const TabContext = createContext(null);
 
 export function TabProvider({ children }) {
   const [tab, setTab] = useState('dash');
-  const value = useMemo(() => ({ tab, setTab }), [tab]);
+  const [navFocus, setNavFocus] = useState(null);
+  const clearNavFocus = useCallback(() => setNavFocus(null), []);
+  const value = useMemo(
+    () => ({ tab, setTab, navFocus, setNavFocus, clearNavFocus }),
+    [tab, navFocus, clearNavFocus]
+  );
   return <TabContext.Provider value={value}>{children}</TabContext.Provider>;
 }
 

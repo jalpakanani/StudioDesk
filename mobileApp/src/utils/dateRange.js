@@ -124,3 +124,22 @@ export function formatDateRangeEn(from, to) {
   if (same) return left || '—';
   return `${left} – ${formatISODateDisplay(to || from)}`;
 }
+
+/** Local calendar date at noon — stable for pickers and TZ quirks. */
+export function isoToLocalNoonDate(iso) {
+  const n = coerceDateFieldToISO(iso);
+  if (!n || !/^\d{4}-\d{2}-\d{2}$/.test(n)) {
+    const t = new Date();
+    return new Date(t.getFullYear(), t.getMonth(), t.getDate(), 12, 0, 0, 0);
+  }
+  const [y, mo, da] = n.split('-').map((x) => parseInt(x, 10));
+  return new Date(y, mo - 1, da, 12, 0, 0, 0);
+}
+
+export function localNoonDateToISO(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}

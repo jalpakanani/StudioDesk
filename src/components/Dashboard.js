@@ -23,6 +23,11 @@ import {
   orderPastDueWithBalance,
   visitTouchesTomorrow,
 } from '../utils/reminders'
+import {
+  deriveOrderWorkflowStatus,
+  isOrderWorkflowClosed,
+  orderWorkflowLabel,
+} from '../utils/orderWorkflow'
 
 function todayISO() {
   return localCalendarTodayISO()
@@ -69,8 +74,8 @@ export default function Dashboard() {
   const [notifPerm, setNotifPerm] = useState(() =>
     typeof Notification !== 'undefined' ? Notification.permission : 'denied',
   )
+  const todayDesk = todayISO()
   const futureOrderRows = useMemo(() => {
-    const t = todayISO()
     return orders
       .map(o => {
         const received = sumPayments(o.clientPayments)
@@ -78,7 +83,7 @@ export default function Dashboard() {
         const due = total - received
         return {order: o, received, due, total}
       })
-      .filter(x => isOrderFuture(x.order, t))
+      .filter(x => isOrderFuture(x.order, todayDesk) && !isOrderWorkflowClosed(x.order, todayDesk))
       .sort((a, b) => {
         const c = futureOrderSortKey(a.order).localeCompare(
           futureOrderSortKey(b.order),
@@ -87,12 +92,36 @@ export default function Dashboard() {
         if (b.due !== a.due) return b.due - a.due
         return (a.order.title || '').localeCompare(b.order.title || '')
       })
-  }, [orders])
+  }, [orders, todayDesk])
 
   /** Only unpaid portion on still-upcoming orders (stat tile). */
   const totalClientDue = useMemo(() => {
     return futureOrderRows.reduce((s, x) => s + Math.max(0, x.due), 0)
   }, [futureOrderRows])
+
+  /** Per client: sum of (quote − received) across orders with balance. */
+  const clientsWithBalanceDue = useMemo(() => {
+    const map = new Map()
+    for (const o of orders) {
+      const received = sumPayments(o.clientPayments)
+      const total = Number(o.totalAmount) || 0
+      const due = total - received
+      if (due <= 0 || !o.clientId) continue
+      const cur = map.get(o.clientId) || {dueSum: 0, orderCount: 0}
+      cur.dueSum += due
+      cur.orderCount += 1
+      map.set(o.clientId, cur)
+    }
+    return Array.from(map.entries())
+      .map(([clientId, agg]) => ({
+        clientId,
+        name: String(clientById.get(clientId)?.name || '').trim() || '—',
+        dueSum: agg.dueSum,
+        orderCount: agg.orderCount,
+      }))
+      .filter(x => x.dueSum > 0)
+      .sort((a, b) => b.dueSum - a.dueSum)
+  }, [orders, clientById])
 
   const visitBalances = useMemo(() => {
     return (fieldVisits || []).map(v => {
@@ -162,7 +191,7 @@ export default function Dashboard() {
   const tomorrowOrders = useMemo(() => {
     const t = todayISO()
     return orders
-      .filter(o => orderEventStartsTomorrow(o, t))
+      .filter(o => !isOrderWorkflowClosed(o, t) && orderEventStartsTomorrow(o, t))
       .map(o => ({
         order: o,
         client: clientById.get(o.clientId)?.name || '—',
@@ -185,6 +214,7 @@ export default function Dashboard() {
     const {weekStart, weekEnd} = calendarWeekRangeISO(t)
     return orders
       .filter(o => {
+        if (isOrderWorkflowClosed(o, t)) return false
         const r = orderEventRange(o)
         if (r.from) return rangeOverlapsWindow(r.from, r.to || r.from, weekStart, weekEnd)
         const od = coerceDateFieldToISO(o.orderDate)
@@ -221,7 +251,7 @@ export default function Dashboard() {
   const pastDueOrders = useMemo(() => {
     const t = todayISO()
     return orders
-      .filter(o => orderPastDueWithBalance(o, t))
+      .filter(o => !isOrderWorkflowClosed(o, t) && orderPastDueWithBalance(o, t))
       .map(o => {
         const received = sumPayments(o.clientPayments)
         const due = (Number(o.totalAmount) || 0) - received
@@ -517,7 +547,7 @@ export default function Dashboard() {
           <span className="stat-value stat-value-money">
             {formatINR(totalClientDue)}
           </span>
-          <span className="stat-hint">Orders not ended</span>
+          <span className="stat-hint">Open jobs only — closed hidden</span>
         </div>
         <div className="stat-tile stat-tile-5 stat-tile-static">
           <span className="stat-label">Est. profit (all time)</span>
@@ -568,12 +598,49 @@ export default function Dashboard() {
       </div>
 
       <div className="dash-grid">
+        {clientsWithBalanceDue.length > 0 ? (
+          <section
+            className="card card-lift dash-card card-wide"
+            aria-label="Clients with balance due"
+          >
+            <div className="dash-card-head">
+              <h3>Clients with balance due</h3>
+              <p className="dash-card-subtitle">
+                All studio orders where something is still to collect—grouped by client. Open{' '}
+                <strong>Orders</strong> to add a payment.
+              </p>
+            </div>
+            <ul className="dash-feed">
+              {clientsWithBalanceDue.map(row => (
+                <li key={row.clientId} className="dash-feed-item dash-feed-item--client">
+                  <div>
+                    <div className="dash-feed-title">{row.name}</div>
+                    <div className="muted small">
+                      {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
+                    </div>
+                  </div>
+                  <div className="dash-feed-money">
+                    <div className="dash-feed-due">{formatINR(row.dueSum)}</div>
+                    <div className="dash-feed-received">to collect</div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div style={{marginTop: '0.5rem'}}>
+              <button type="button" className="btn primary btn-sm shine" onClick={() => setTab('orders')}>
+                Open orders
+              </button>
+            </div>
+          </section>
+        ) : null}
+
         <section className="card card-lift dash-card">
           <div className="dash-card-head">
             <h3>Upcoming orders</h3>
             <p className="dash-card-subtitle">
-              Future jobs on the calendar—shown even when fully paid; balance
-              due when anything is left to receive.
+              Jobs whose event is still running or coming up (end date today or later—or no event date yet). After the
+              event, once fully paid, they become <strong>Closed</strong> and leave this list. Past events with a
+              balance due show under <strong>Reminders</strong>.
             </p>
           </div>
           {futureOrderRows.length === 0 ? (
@@ -583,8 +650,8 @@ export default function Dashboard() {
               </span>
               <p className="dash-empty-title">No upcoming orders</p>
               <p className="dash-empty-text">
-                When an order&apos;s event is still today or ahead, it appears
-                here.
+                Nothing on the calendar through today for open jobs. Orders with payment still due after the event
+                appear under <strong>Reminders → Collect payment</strong>.
               </p>
               <button
                 type="button"
@@ -607,7 +674,14 @@ export default function Dashboard() {
                     className="dash-feed-item dash-feed-item--client"
                   >
                     <div>
-                      <div className="dash-feed-title">{order.title}</div>
+                      <div className="dash-feed-title-row">
+                        <span className="dash-feed-title">{order.title}</span>
+                        <span
+                          className={`order-workflow-pill order-workflow-pill--${deriveOrderWorkflowStatus(order, todayDesk)}`}
+                        >
+                          {orderWorkflowLabel(deriveOrderWorkflowStatus(order, todayDesk))}
+                        </span>
+                      </div>
                       {whenLabel ? (
                         <div className="dash-order-when">
                           <span

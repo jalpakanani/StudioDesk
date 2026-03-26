@@ -12,6 +12,7 @@ import {
   visitTouchesTomorrow,
   writeReminderSig,
 } from '../utils/reminders';
+import { isOrderWorkflowClosed } from '../utils/orderWorkflow';
 
 /** ~2h 45m → up to 5 pings fit in a typical waking day without stacking too tight. */
 const MIN_GAP_MS = 2.75 * 60 * 60 * 1000;
@@ -32,9 +33,13 @@ export function useReminderNotifications(orders, fieldVisits, clientById) {
 
       const today = localCalendarTodayISO();
 
-      const tomorrowOrders = orders.filter((o) => orderEventStartsTomorrow(o, today));
+      const tomorrowOrders = orders.filter(
+        (o) => !isOrderWorkflowClosed(o, today) && orderEventStartsTomorrow(o, today),
+      );
       const tomorrowVisits = (fieldVisits || []).filter((v) => visitTouchesTomorrow(v, today));
-      const payDue = orders.filter((o) => orderPastDueWithBalance(o, today));
+      const payDue = orders.filter(
+        (o) => !isOrderWorkflowClosed(o, today) && orderPastDueWithBalance(o, today),
+      );
 
       const tomorrowSig = [...tomorrowOrders.map((o) => o.id), ...tomorrowVisits.map((v) => v.id)]
         .sort()

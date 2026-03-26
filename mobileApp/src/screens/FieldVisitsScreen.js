@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useStudio } from '../context/StudioContext';
+import DatePickerField from '../components/DatePickerField';
 import OpenDeskSearchButton from '../components/OpenDeskSearchButton';
 import { fieldVisitRange, formatDateRangeEn, formatISODateDisplay, toISODateOr } from '../utils/dateRange';
 import { formatINR, sumPayments } from '../utils/money';
@@ -275,9 +276,24 @@ function AddVisitForm({ onClose, onCreate }) {
         placeholderTextColor={colors.muted}
       />
       <Text style={styles.label}>From date * (DD/MM/YYYY)</Text>
-      <TextInput style={styles.input} value={dateFrom} onChangeText={setDateFrom} />
+      <DatePickerField
+        style={styles.input}
+        value={dateFrom}
+        onChangeValue={setDateFrom}
+        placeholder="DD/MM/YYYY"
+        placeholderTextColor={colors.muted}
+        fallbackISO={todayISO}
+      />
       <Text style={styles.label}>To date (optional)</Text>
-      <TextInput style={styles.input} value={dateTo} onChangeText={setDateTo} placeholder="Multi-day end" placeholderTextColor={colors.muted} />
+      <DatePickerField
+        style={styles.input}
+        value={dateTo}
+        onChangeValue={setDateTo}
+        placeholder="Multi-day end"
+        placeholderTextColor={colors.muted}
+        fallbackISO={toISODateOr(dateFrom, todayISO)}
+        allowEmpty
+      />
       <Text style={styles.label}>Time</Text>
       <TextInput
         style={styles.input}

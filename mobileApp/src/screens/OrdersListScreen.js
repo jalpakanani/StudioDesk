@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import DatePickerField from '../components/DatePickerField';
 import OpenDeskSearchButton from '../components/OpenDeskSearchButton';
 import { useStudio } from '../context/StudioContext';
 import {
@@ -21,6 +24,8 @@ import {
 } from '../utils/dateRange';
 import { formatINR, sumPayments } from '../utils/money';
 import { colors, radius } from '../theme';
+import { deriveOrderWorkflowStatus, orderWorkflowLabel } from '../utils/orderWorkflow';
+import { localCalendarTodayISO } from '../utils/reminders';
 
 function orderSortKey(o) {
   const { from, to } = orderEventRange(o);
@@ -40,16 +45,16 @@ export default function OrdersListScreen() {
   const [newClientId, setNewClientId] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newTotal, setNewTotal] = useState('');
-  const [newOrderDate, setNewOrderDate] = useState(() =>
-    formatISODateDisplay(new Date().toISOString().slice(0, 10)),
-  );
+  const [newOrderDate, setNewOrderDate] = useState(() => formatISODateDisplay(localCalendarTodayISO()));
   const [newEventFrom, setNewEventFrom] = useState('');
   const [newEventTo, setNewEventTo] = useState('');
   const [newAddress, setNewAddress] = useState('');
   const [showNewOrderForm, setShowNewOrderForm] = useState(false);
+  const [clientMenuOpen, setClientMenuOpen] = useState(false);
   const [pulseOrderId, setPulseOrderId] = useState(null);
 
   const highlightOrderId = route.params?.highlightOrderId;
+  const deskToday = localCalendarTodayISO();
 
   useFocusEffect(
     useCallback(() => {
@@ -83,8 +88,18 @@ export default function OrdersListScreen() {
     [orders],
   );
 
+  const clientsSorted = useMemo(
+    () =>
+      [...clients].sort((a, b) =>
+        String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' }),
+      ),
+    [clients],
+  );
+
+  const todayISO = localCalendarTodayISO();
+
   function submitOrder() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO;
     const orderDateISO = toISODateOr(newOrderDate, today);
     const evFrom = toISODateOr(newEventFrom, '');
     const evToRaw = toISODateOr(newEventTo, '');
@@ -104,6 +119,7 @@ export default function OrdersListScreen() {
       setNewEventTo('');
       setNewAddress('');
       setNewClientId('');
+      setClientMenuOpen(false);
       setShowNewOrderForm(false);
       navigation.navigate('OrderDetail', { orderId: o.id });
     }
@@ -111,10 +127,11 @@ export default function OrdersListScreen() {
 
   function closeNewOrderForm() {
     setShowNewOrderForm(false);
+    setClientMenuOpen(false);
     setNewClientId('');
     setNewTitle('');
     setNewTotal('');
-    setNewOrderDate(formatISODateDisplay(new Date().toISOString().slice(0, 10)));
+    setNewOrderDate(formatISODateDisplay(localCalendarTodayISO()));
     setNewEventFrom('');
     setNewEventTo('');
     setNewAddress('');
@@ -182,23 +199,70 @@ export default function OrdersListScreen() {
               </TouchableOpacity>
             </View>
             <Text style={styles.labelCaps}>Client *</Text>
-            {!newClientId ? (
-              <Text style={styles.selectHint}>— Select —</Text>
-            ) : (
-              <Text style={styles.selectedClientName}>{clientById.get(newClientId)?.name}</Text>
-            )}
-            <Text style={styles.quickSelectLabel}>Quick select</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-              {clients.map((c) => (
-                <TouchableOpacity
-                  key={c.id}
-                  style={[styles.chip, newClientId === c.id && styles.chipOn]}
-                  onPress={() => setNewClientId(c.id)}
-                >
-                  <Text style={[styles.chipText, newClientId === c.id && styles.chipTextOn]}>{c.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+            <TouchableOpacity
+              style={styles.clientSelectField}
+              onPress={() => setClientMenuOpen(true)}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={newClientId ? styles.clientSelectText : styles.clientSelectPlaceholder}
+                numberOfLines={1}
+              >
+                {newClientId ? clientById.get(newClientId)?.name : '— Select —'}
+              </Text>
+              <Text style={styles.clientSelectChevron}>▼</Text>
+            </TouchableOpacity>
+
+            <Modal
+              visible={clientMenuOpen}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setClientMenuOpen(false)}
+            >
+              <View style={styles.clientMenuRoot}>
+                <Pressable
+                  style={styles.clientMenuBackdrop}
+                  onPress={() => setClientMenuOpen(false)}
+                />
+                <View style={styles.clientMenuCenter} pointerEvents="box-none">
+                  <View style={styles.clientMenuCard}>
+                    <ScrollView
+                      keyboardShouldPersistTaps="handled"
+                      bounces={false}
+                      style={styles.clientMenuScroll}
+                      showsVerticalScrollIndicator
+                    >
+                      <Pressable
+                        style={[styles.clientMenuRow, !newClientId && styles.clientMenuRowSelected]}
+                        onPress={() => {
+                          setNewClientId('');
+                          setClientMenuOpen(false);
+                        }}
+                      >
+                        <Text style={styles.clientMenuCheck}>{!newClientId ? '✓' : ' '}</Text>
+                        <Text style={styles.clientMenuLabel}>— Select —</Text>
+                      </Pressable>
+                      {clientsSorted.map((c) => {
+                        const on = newClientId === c.id;
+                        return (
+                          <Pressable
+                            key={c.id}
+                            style={[styles.clientMenuRow, on && styles.clientMenuRowSelected]}
+                            onPress={() => {
+                              setNewClientId(c.id);
+                              setClientMenuOpen(false);
+                            }}
+                          >
+                            <Text style={styles.clientMenuCheck}>{on ? '✓' : ' '}</Text>
+                            <Text style={styles.clientMenuLabel}>{c.name}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                </View>
+              </View>
+            </Modal>
 
             <Text style={styles.labelCaps}>Order / event name *</Text>
             <TextInput
@@ -221,30 +285,34 @@ export default function OrdersListScreen() {
             />
 
             <Text style={styles.labelCaps}>Order date</Text>
-            <TextInput
+            <DatePickerField
               style={styles.input}
               value={newOrderDate}
-              onChangeText={setNewOrderDate}
+              onChangeValue={setNewOrderDate}
               placeholder="DD/MM/YYYY"
               placeholderTextColor={colors.muted}
+              fallbackISO={todayISO}
             />
 
             <Text style={styles.labelCaps}>Event from</Text>
-            <TextInput
+            <DatePickerField
               style={styles.input}
               value={newEventFrom}
-              onChangeText={setNewEventFrom}
+              onChangeValue={setNewEventFrom}
               placeholder="DD/MM/YYYY"
               placeholderTextColor={colors.muted}
+              fallbackISO={todayISO}
             />
 
             <Text style={styles.labelCaps}>Event to</Text>
-            <TextInput
+            <DatePickerField
               style={styles.input}
               value={newEventTo}
-              onChangeText={setNewEventTo}
+              onChangeValue={setNewEventTo}
               placeholder="Leave empty for single day"
               placeholderTextColor={colors.muted}
+              fallbackISO={toISODateOr(newEventFrom, todayISO)}
+              allowEmpty
             />
 
             <Text style={styles.labelCaps}>Venue / address</Text>
@@ -306,7 +374,17 @@ export default function OrdersListScreen() {
               onPress={() => navigation.navigate('OrderDetail', { orderId: o.id })}
               activeOpacity={0.85}
             >
-              <Text style={styles.jobTitle}>{o.title}</Text>
+              <View style={styles.jobTitleRow}>
+                <Text style={styles.jobTitle}>{o.title}</Text>
+                <Text
+                  style={[
+                    styles.jobWfPill,
+                    styles[`jobWf_${deriveOrderWorkflowStatus(o, deskToday)}`],
+                  ]}
+                >
+                  {orderWorkflowLabel(deriveOrderWorkflowStatus(o, deskToday))}
+                </Text>
+              </View>
               <Text style={styles.jobMeta}>
                 {clientById.get(o.clientId)?.name} · Due:{' '}
                 <Text style={due > 0 ? styles.warn : styles.ok}>{formatINR(Math.max(0, due))}</Text>
@@ -430,21 +508,54 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     marginTop: 12,
   },
-  selectHint: { fontSize: 15, color: colors.muted, marginBottom: 8, fontStyle: 'italic' },
-  selectedClientName: { fontSize: 15, fontWeight: '600', color: colors.text, marginBottom: 8 },
-  chipScroll: { marginBottom: 4, maxHeight: 48 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: colors.surfaceSolid,
-    marginRight: 8,
+  clientSelectField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.inputBg,
     borderWidth: 1,
     borderColor: colors.inputBorder,
+    borderRadius: radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    minHeight: 50,
+    gap: 8,
   },
-  chipOn: { borderColor: colors.primary, backgroundColor: colors.chipOnBg },
-  chipText: { color: colors.muted, fontSize: 14, fontWeight: '500' },
-  chipTextOn: { color: colors.primary, fontWeight: '700' },
+  clientSelectText: { flex: 1, fontSize: 16, fontWeight: '600', color: colors.text },
+  clientSelectPlaceholder: { flex: 1, fontSize: 16, color: colors.muted },
+  clientSelectChevron: { fontSize: 11, color: colors.muted, marginTop: 2 },
+  clientMenuRoot: { flex: 1 },
+  clientMenuBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.48)',
+  },
+  clientMenuCenter: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  clientMenuCard: {
+    borderRadius: 12,
+    backgroundColor: '#2c2c2e',
+    maxHeight: 360,
+    overflow: 'hidden',
+  },
+  clientMenuScroll: { maxHeight: 360 },
+  clientMenuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.12)',
+  },
+  clientMenuRowSelected: { backgroundColor: 'rgba(255,255,255,0.08)' },
+  clientMenuCheck: {
+    width: 28,
+    fontSize: 17,
+    color: '#fff',
+    fontWeight: '700',
+  },
+  clientMenuLabel: { flex: 1, fontSize: 17, color: '#f2f2f7' },
   input: {
     backgroundColor: colors.inputBg,
     borderWidth: 1,
@@ -502,7 +613,42 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     backgroundColor: colors.accentSoft,
   },
-  jobTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
+  jobTitle: { fontSize: 17, fontWeight: '700', color: colors.text, flex: 1, minWidth: 0 },
+  jobTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  jobWfPill: {
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  jobWf_booked: {
+    backgroundColor: colors.accentSoft,
+    color: colors.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(91,74,232,0.28)',
+  },
+  jobWf_in_progress: {
+    backgroundColor: 'rgba(251,191,36,0.22)',
+    color: '#b45309',
+    borderWidth: 1,
+    borderColor: 'rgba(217,119,6,0.35)',
+  },
+  jobWf_pending_payment: {
+    backgroundColor: 'rgba(251,191,36,0.25)',
+    color: '#9a3412',
+    borderWidth: 1,
+    borderColor: 'rgba(234,88,12,0.4)',
+  },
+  jobWf_closed: {
+    backgroundColor: colors.surfaceSolid,
+    color: colors.muted,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   jobMeta: { fontSize: 13, color: colors.muted, marginTop: 4 },
   jobAddress: { fontSize: 12, color: colors.muted, marginTop: 4, lineHeight: 17 },
   warn: { color: colors.warn, fontWeight: '700' },

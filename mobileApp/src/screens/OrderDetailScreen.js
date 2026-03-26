@@ -11,10 +11,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import DatePickerField from '../components/DatePickerField';
 import { useStudio } from '../context/StudioContext';
 import { coerceDateFieldToISO, formatISODateDisplay, orderEventRange, toISODateOr } from '../utils/dateRange';
 import { formatINR, sumPayments } from '../utils/money';
 import { colors, radius } from '../theme';
+import { deriveOrderWorkflowStatus, orderWorkflowLabel } from '../utils/orderWorkflow';
+import { localCalendarTodayISO } from '../utils/reminders';
 
 export default function OrderDetailScreen() {
   const navigation = useNavigation();
@@ -86,6 +89,19 @@ export default function OrderDetailScreen() {
       </View>
       <Text style={styles.clientLine}>Client: {clientName}</Text>
 
+      <View style={styles.autoStatusBanner}>
+        <Text style={styles.autoStatusLabel}>Status</Text>
+        <Text
+          style={[
+            styles.autoStatusPill,
+            styles[`autoStatus_${deriveOrderWorkflowStatus(order, localCalendarTodayISO())}`],
+          ]}
+        >
+          {orderWorkflowLabel(deriveOrderWorkflowStatus(order, localCalendarTodayISO()))}
+        </Text>
+        <Text style={styles.autoStatusHint}>From event dates and balance due.</Text>
+      </View>
+
       <OrderMetaForm key={order.id} order={order} updateOrder={updateOrder} />
 
       <MoneyStrip order={order} />
@@ -134,10 +150,11 @@ function OrderMetaForm({ order, updateOrder }) {
     setOrderDate(formatISODateDisplay(order.orderDate || ''));
     setEventDateFrom(formatISODateDisplay(from));
     setEventDateTo(from && to === from ? '' : formatISODateDisplay(to));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- narrow deps: avoid resetting on every `order` reference
   }, [order.id, order.orderDate, order.eventDateFrom, order.eventDateTo]);
 
   function saveMeta() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localCalendarTodayISO();
     const fallbackOrder = coerceDateFieldToISO(order.orderDate) || today;
     let evFrom = toISODateOr(eventDateFrom, '');
     let evTo = toISODateOr(eventDateTo, '');
@@ -154,6 +171,11 @@ function OrderMetaForm({ order, updateOrder }) {
     });
   }
 
+  const today = localCalendarTodayISO();
+  const orderDateFallback = coerceDateFieldToISO(order.orderDate) || today;
+  const evFromFallback = toISODateOr(eventDateFrom, today);
+  const evToFallback = toISODateOr(eventDateTo, evFromFallback);
+
   return (
     <View style={styles.card}>
       <Text style={styles.labelCaps}>Name</Text>
@@ -168,30 +190,34 @@ function OrderMetaForm({ order, updateOrder }) {
       />
 
       <Text style={styles.labelCaps}>Order date</Text>
-      <TextInput
+      <DatePickerField
         style={styles.input}
         value={orderDate}
-        onChangeText={setOrderDate}
+        onChangeValue={setOrderDate}
         placeholder="DD/MM/YYYY"
         placeholderTextColor={colors.muted}
+        fallbackISO={orderDateFallback}
       />
 
       <Text style={styles.labelCaps}>Event from</Text>
-      <TextInput
+      <DatePickerField
         style={styles.input}
         value={eventDateFrom}
-        onChangeText={setEventDateFrom}
+        onChangeValue={setEventDateFrom}
         placeholder="DD/MM/YYYY"
         placeholderTextColor={colors.muted}
+        fallbackISO={evFromFallback}
       />
 
       <Text style={styles.labelCaps}>Event to</Text>
-      <TextInput
+      <DatePickerField
         style={styles.input}
         value={eventDateTo}
-        onChangeText={setEventDateTo}
+        onChangeValue={setEventDateTo}
         placeholder="DD/MM/YYYY"
         placeholderTextColor={colors.muted}
+        fallbackISO={evToFallback}
+        allowEmpty
       />
 
       <Text style={styles.helper}>
@@ -405,14 +431,12 @@ function ExposureGuestsBlock({
 
 function ClientPaymentsBlock({ order, addClientPayment, removeClientPayment }) {
   const [payAmount, setPayAmount] = useState('');
-  const [payDate, setPayDate] = useState(() =>
-    formatISODateDisplay(new Date().toISOString().slice(0, 10)),
-  );
+  const [payDate, setPayDate] = useState(() => formatISODateDisplay(localCalendarTodayISO()));
   const [payNote, setPayNote] = useState('');
 
   function addPay() {
     if (!payAmount) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localCalendarTodayISO();
     const d = toISODateOr(payDate, today);
     addClientPayment(order.id, { amount: payAmount, date: d, note: payNote });
     setPayAmount('');
@@ -431,12 +455,13 @@ function ClientPaymentsBlock({ order, addClientPayment, removeClientPayment }) {
         placeholderTextColor={colors.muted}
       />
       <Text style={styles.labelCaps}>Payment date</Text>
-      <TextInput
+      <DatePickerField
         style={styles.input}
         value={payDate}
-        onChangeText={setPayDate}
+        onChangeValue={setPayDate}
         placeholder="DD/MM/YYYY"
         placeholderTextColor={colors.muted}
+        fallbackISO={localCalendarTodayISO()}
       />
       <Text style={styles.labelCaps}>Note</Text>
       <TextInput
@@ -486,7 +511,59 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dangerSoftBg,
   },
   deleteOutlineText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
-  clientLine: { fontSize: 14, color: colors.muted, marginTop: 8, marginBottom: 14 },
+  clientLine: { fontSize: 14, color: colors.muted, marginTop: 8, marginBottom: 10 },
+  autoStatusBanner: {
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 12,
+  },
+  autoStatusLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: colors.muted,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  autoStatusPill: {
+    alignSelf: 'flex-start',
+    fontSize: 12,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  autoStatus_booked: {
+    backgroundColor: colors.accentSoft,
+    color: colors.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(91,74,232,0.28)',
+  },
+  autoStatus_in_progress: {
+    backgroundColor: 'rgba(251,191,36,0.22)',
+    color: '#b45309',
+    borderWidth: 1,
+    borderColor: 'rgba(217,119,6,0.35)',
+  },
+  autoStatus_pending_payment: {
+    backgroundColor: 'rgba(251,191,36,0.25)',
+    color: '#9a3412',
+    borderWidth: 1,
+    borderColor: 'rgba(234,88,12,0.4)',
+  },
+  autoStatus_closed: {
+    backgroundColor: colors.surfaceSolid,
+    color: colors.muted,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  autoStatusHint: { fontSize: 12, color: colors.muted, marginTop: 8, lineHeight: 17 },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.md,

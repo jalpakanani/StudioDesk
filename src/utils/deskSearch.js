@@ -1,4 +1,6 @@
 import { fieldVisitRange, formatDateRangeEn, orderEventRange } from './dateRange';
+import { deriveOrderWorkflowStatus, orderWorkflowSearchText } from './orderWorkflow';
+import { localCalendarTodayISO } from './reminders';
 
 function norm(s) {
   return String(s ?? '')
@@ -28,6 +30,7 @@ export function buildDeskSearchResults(rawQuery, { clients, orders, fieldVisits,
 
   const out = [];
   const cap = 24;
+  const today = localCalendarTodayISO();
 
   for (const c of clients || []) {
     const text = haystack([c.name, c.phone, c.notes]);
@@ -44,7 +47,14 @@ export function buildDeskSearchResults(rawQuery, { clients, orders, fieldVisits,
 
   for (const o of orders || []) {
     const client = clientById?.get?.(o.clientId);
-    const text = haystack([o.title, o.notes, o.address, client?.name, client?.phone]);
+    const text = haystack([
+      o.title,
+      o.notes,
+      o.address,
+      orderWorkflowSearchText(deriveOrderWorkflowStatus(o, today)),
+      client?.name,
+      client?.phone,
+    ]);
     if (!matchesTokens(text, tokens)) continue;
     const ev = orderEventRange(o);
     const when = ev.from ? formatDateRangeEn(ev.from, ev.to) : '';

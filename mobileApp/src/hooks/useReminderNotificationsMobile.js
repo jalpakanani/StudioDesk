@@ -16,6 +16,7 @@ import {
   writeReminderSig,
 } from '../utils/remindersStorage';
 import { ensureDeskReminderChannel, getDeskNotificationAuthorized, DESK_REMINDER_CHANNEL_ID } from '../notifications/notifeeDesk';
+import { isOrderWorkflowClosed } from '../utils/orderWorkflow';
 
 const MIN_GAP_MS = 2.75 * 60 * 60 * 1000;
 const MAX_NOTIFS_PER_KIND_PER_DAY = 5;
@@ -47,9 +48,13 @@ export function useReminderNotificationsMobile(orders, fieldVisits, clientById) 
       const today = localCalendarTodayISO();
       const list = fieldVisits || [];
 
-      const tomorrowOrders = orders.filter((o) => orderEventStartsTomorrow(o, today));
+      const tomorrowOrders = orders.filter(
+        (o) => !isOrderWorkflowClosed(o, today) && orderEventStartsTomorrow(o, today),
+      );
       const tomorrowVisits = list.filter((v) => visitTouchesTomorrow(v, today));
-      const payDue = orders.filter((o) => orderPastDueWithBalance(o, today));
+      const payDue = orders.filter(
+        (o) => !isOrderWorkflowClosed(o, today) && orderPastDueWithBalance(o, today),
+      );
 
       const tomorrowSig = [...tomorrowOrders.map((o) => o.id), ...tomorrowVisits.map((v) => v.id)]
         .sort()

@@ -37,6 +37,11 @@ import { colors, radius } from '../theme';
 import { getDeskNotificationState } from '../notifications/notifeeDesk';
 import OpenDeskSearchButton from '../components/OpenDeskSearchButton';
 import { navigateToDeskSettings } from '../navigation/navigateSettings';
+import {
+  deriveOrderWorkflowStatus,
+  isOrderWorkflowClosed,
+  orderWorkflowLabel,
+} from '../utils/orderWorkflow';
 
 function todayISO() {
   return localCalendarTodayISO();
@@ -104,7 +109,7 @@ export default function DashboardScreen() {
         const due = total - received;
         return { order: o, received, due, total };
       })
-      .filter(x => isOrderFuture(x.order, t))
+      .filter(x => isOrderFuture(x.order, t) && !isOrderWorkflowClosed(x.order, t))
       .sort((a, b) => {
         const c = futureOrderSortKey(a.order).localeCompare(
           futureOrderSortKey(b.order),
@@ -119,6 +124,29 @@ export default function DashboardScreen() {
     () => futureOrderRows.reduce((s, x) => s + Math.max(0, x.due), 0),
     [futureOrderRows],
   );
+
+  const clientsWithBalanceDue = useMemo(() => {
+    const map = new Map();
+    for (const o of orders) {
+      const received = sumPayments(o.clientPayments);
+      const total = Number(o.totalAmount) || 0;
+      const due = total - received;
+      if (due <= 0 || !o.clientId) continue;
+      const cur = map.get(o.clientId) || { dueSum: 0, orderCount: 0 };
+      cur.dueSum += due;
+      cur.orderCount += 1;
+      map.set(o.clientId, cur);
+    }
+    return Array.from(map.entries())
+      .map(([clientId, agg]) => ({
+        clientId,
+        name: String(clientById.get(clientId)?.name || '').trim() || '—',
+        dueSum: agg.dueSum,
+        orderCount: agg.orderCount,
+      }))
+      .filter(x => x.dueSum > 0)
+      .sort((a, b) => b.dueSum - a.dueSum);
+  }, [orders, clientById]);
 
   const visitBalances = useMemo(() => {
     return (fieldVisits || []).map(v => {
@@ -180,7 +208,7 @@ export default function DashboardScreen() {
 
   const tomorrowOrders = useMemo(() => {
     return orders
-      .filter(o => orderEventStartsTomorrow(o, t))
+      .filter(o => !isOrderWorkflowClosed(o, t) && orderEventStartsTomorrow(o, t))
       .map(o => ({
         order: o,
         client: clientById.get(o.clientId)?.name || '—',
@@ -199,7 +227,7 @@ export default function DashboardScreen() {
 
   const pastDueOrders = useMemo(() => {
     return orders
-      .filter(o => orderPastDueWithBalance(o, t))
+      .filter(o => !isOrderWorkflowClosed(o, t) && orderPastDueWithBalance(o, t))
       .map(o => {
         const received = sumPayments(o.clientPayments);
         const due = (Number(o.totalAmount) || 0) - received;
@@ -222,6 +250,7 @@ export default function DashboardScreen() {
     const { weekStart, weekEnd } = calendarWeekRangeISO(t);
     return orders
       .filter(o => {
+        if (isOrderWorkflowClosed(o, t)) return false;
         const r = orderEventRange(o);
         if (r.from)
           return rangeOverlapsWindow(
@@ -562,7 +591,7 @@ export default function DashboardScreen() {
             <Text style={[styles.statValue, styles.statMoney]}>
               {formatINR(totalClientDue)}
             </Text>
-            <Text style={styles.statHint}>Orders not ended</Text>
+            <Text style={styles.statHint}>Open jobs — closed hidden</Text>
           </View>
           <View style={[styles.statTile, styles.statTileStatic]}>
             <Text style={styles.statLabel}>Est. profit (all time)</Text>
@@ -608,18 +637,51 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
+        {clientsWithBalanceDue.length > 0 ? (
+          <View style={styles.card} accessibilityLabel="Clients with balance due">
+            <Text style={styles.cardTitle}>Clients with balance due</Text>
+            <Text style={styles.cardSub}>
+              All orders where something is still to collect—grouped by client. Open Orders to add a payment.
+            </Text>
+            {clientsWithBalanceDue.map((row, idx) => (
+              <View
+                key={row.clientId}
+                style={[styles.clientBalRow, idx === 0 && styles.clientBalRowFirst]}
+              >
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.feedTitle}>{row.name}</Text>
+                  <Text style={styles.mutedSmall}>
+                    {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
+                  </Text>
+                </View>
+                <View style={{ alignItems: 'flex-end', maxWidth: '42%' }}>
+                  <Text style={styles.feedDue}>{formatINR(row.dueSum)}</Text>
+                  <Text style={[styles.feedReceived, { textAlign: 'right' }]}>to collect</Text>
+                </View>
+              </View>
+            ))}
+            <TouchableOpacity
+              style={styles.cardFooterBtn}
+              onPress={() => navigation.navigate('Orders')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.emptyBtnText}>Open orders</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Upcoming orders</Text>
           <Text style={styles.cardSub}>
-            Future jobs on the calendar—shown even when fully paid; balance due
-            when anything is left to receive.
+            Event still running or coming up (end today or later, or no event date). After the event, fully paid jobs
+            become Closed and leave. Past events with balance due show under Reminders.
           </Text>
           {futureOrderRows.length === 0 ? (
             <View style={styles.emptyInner}>
               <Text style={styles.emptyIcon}>✦</Text>
               <Text style={styles.emptyTitle}>No upcoming orders</Text>
               <Text style={styles.emptyText}>
-                When an order's event is still today or ahead, it appears here.
+                Nothing in this window. Past events with payment due appear under Reminders → Collect payment.
               </Text>
               <TouchableOpacity
                 style={styles.emptyBtn}
@@ -634,10 +696,17 @@ export default function DashboardScreen() {
               const dueOutstanding = Math.max(0, due);
               const overpaid = due < 0;
               const whenLabel = upcomingOrderWhenLabel(order);
+              const wf = deriveOrderWorkflowStatus(order, t);
+              const wfPillStyle = styles[`wfPill_${wf}`] ?? styles.wfPill_booked;
               return (
                 <View key={order.id} style={styles.feedItem}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.feedTitle}>{order.title}</Text>
+                    <View style={styles.feedTitleRow}>
+                      <Text style={styles.feedTitle}>{order.title}</Text>
+                      <Text style={[styles.wfPill, wfPillStyle]}>
+                        {orderWorkflowLabel(wf)}
+                      </Text>
+                    </View>
                     {whenLabel ? (
                       <Text style={styles.pillDate}>{whenLabel}</Text>
                     ) : (
@@ -1098,6 +1167,15 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
   cardSub: { fontSize: 13, color: colors.muted, marginTop: 6, lineHeight: 19 },
+  clientBalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    gap: 8,
+  },
+  clientBalRowFirst: { borderTopWidth: 0, paddingTop: 4 },
   emptyInner: { alignItems: 'center', paddingVertical: 20 },
   emptyIcon: { fontSize: 28, marginBottom: 8 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.text },
@@ -1131,7 +1209,47 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     gap: 8,
   },
-  feedTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
+  feedTitle: { fontSize: 15, fontWeight: '700', color: colors.text, flex: 1, minWidth: 0 },
+  feedTitleRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
+  wfPill: {
+    fontSize: 9,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  wfPill_booked: {
+    backgroundColor: colors.accentSoft,
+    color: colors.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(91,74,232,0.28)',
+  },
+  wfPill_in_progress: {
+    backgroundColor: 'rgba(251,191,36,0.22)',
+    color: '#b45309',
+    borderWidth: 1,
+    borderColor: 'rgba(217,119,6,0.35)',
+  },
+  wfPill_pending_payment: {
+    backgroundColor: 'rgba(251,191,36,0.25)',
+    color: '#9a3412',
+    borderWidth: 1,
+    borderColor: 'rgba(234,88,12,0.4)',
+  },
+  wfPill_closed: {
+    backgroundColor: colors.surfaceSolid,
+    color: colors.muted,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   pillDate: {
     fontSize: 12,
     color: colors.primary,

@@ -3,6 +3,8 @@ import { useStudio } from '../context/StudioContext';
 import { useTab } from '../context/TabContext';
 import { formatINR, sumPayments } from '../utils/money';
 import { formatDateRangeEn, formatISODateDisplay, orderEventRange } from '../utils/dateRange';
+import { deriveOrderWorkflowStatus, orderWorkflowLabel } from '../utils/orderWorkflow';
+import { localCalendarTodayISO } from '../utils/reminders';
 
 export default function OrdersView() {
   const { setTab, navFocus, clearNavFocus } = useTab();
@@ -31,6 +33,7 @@ export default function OrdersView() {
   const [newAddress, setNewAddress] = useState('');
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) || null, [orders, selectedId]);
+  const deskToday = localCalendarTodayISO();
 
   useEffect(() => {
     if (!navFocus || navFocus.kind !== 'order') return;
@@ -82,7 +85,8 @@ export default function OrdersView() {
           <h2 className="panel-title">Orders</h2>
           <p className="panel-lead">
             Quote, booking date, optional <strong>event from → to</strong> for multi-day functions (e.g. wedding),
-            and client payments.
+            venue/address, and client payments. <strong>Status</strong> updates from dates and balance (Booked → In
+            progress → Payment pending → Closed).
           </p>
         </div>
       </div>
@@ -203,7 +207,14 @@ export default function OrdersView() {
                     className={`pick ${selectedId === o.id ? 'active' : ''}`}
                     onClick={() => setSelectedId(o.id)}
                   >
-                    <div className="pick-title">{o.title}</div>
+                    <div className="pick-title-row">
+                      <div className="pick-title">{o.title}</div>
+                      <span
+                        className={`order-workflow-pill order-workflow-pill--${deriveOrderWorkflowStatus(o, deskToday)}`}
+                      >
+                        {orderWorkflowLabel(deriveOrderWorkflowStatus(o, deskToday))}
+                      </span>
+                    </div>
                     <div className="muted small">
                       {clientById.get(o.clientId)?.name} · Due:{' '}
                       <span className={due > 0 ? 'warn' : 'ok'}>{formatINR(Math.max(0, due))}</span>
@@ -343,6 +354,13 @@ function OrderDetail({
           Total (₹)
           <input type="number" min="0" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} />
         </label>
+        <p className="muted small full" style={{ gridColumn: '1 / -1', margin: '0 0 0.25rem' }}>
+          Status:{' '}
+          <strong className={`order-workflow-pill order-workflow-pill--${deriveOrderWorkflowStatus(order, localCalendarTodayISO())}`} style={{ display: 'inline-block', marginLeft: '0.35rem' }}>
+            {orderWorkflowLabel(deriveOrderWorkflowStatus(order, localCalendarTodayISO()))}
+          </strong>
+          <span className="muted"> — from event dates and amount due.</span>
+        </p>
         <label>
           Order date
           <input type="date" lang="en-IN" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />

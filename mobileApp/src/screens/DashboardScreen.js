@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -11,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { useStudio } from '../context/StudioContext';
 import {
   calendarWeekRangeISO,
@@ -22,13 +21,7 @@ import {
   rangeOverlapsWindow,
 } from '../utils/dateRange';
 import { formatINR, sumPayments } from '../utils/money';
-import {
-  addDaysISO,
-  localCalendarTodayISO,
-  orderEventStartsTomorrow,
-  orderPastDueWithBalance,
-  visitTouchesTomorrow,
-} from '../utils/reminders';
+import { localCalendarTodayISO } from '../utils/reminders';
 import {
   buildSettlementRows,
   computeStudioProfit,
@@ -36,9 +29,7 @@ import {
   settlementNeedsLinkHint,
 } from '../utils/settlement';
 import { colors, radius } from '../theme';
-import { getDeskNotificationState } from '../notifications/notifeeDesk';
 import OpenDeskSearchButton from '../components/OpenDeskSearchButton';
-import { navigateToDeskSettings } from '../navigation/navigateSettings';
 import {
   deriveOrderWorkflowStatus,
   isOrderWorkflowClosed,
@@ -323,8 +314,6 @@ function upcomingOrderWhenLabel(order) {
 export default function DashboardScreen() {
   const navigation = useNavigation();
   const { orders, clients, clientById, fieldVisits, syncError } = useStudio();
-  const [notifAuth, setNotifAuth] = useState(false);
-  const [notifDenied, setNotifDenied] = useState(false);
   const [listPageSize, setListPageSize] = useState(DASH_LIST_PAGE_SIZE_DEFAULT);
 
   useEffect(() => {
@@ -348,21 +337,6 @@ export default function DashboardScreen() {
       () => {},
     );
   }, [listPageSize]);
-
-  useFocusEffect(
-    useCallback(() => {
-      let alive = true;
-      getDeskNotificationState().then(({ authorized, denied }) => {
-        if (alive) {
-          setNotifAuth(authorized);
-          setNotifDenied(denied);
-        }
-      });
-      return () => {
-        alive = false;
-      };
-    }, []),
-  );
 
   const t = todayISO();
 
@@ -486,41 +460,6 @@ export default function DashboardScreen() {
     [orders, fieldVisits],
   );
 
-  const tomorrowOrders = useMemo(() => {
-    return orders
-      .filter(o => !isOrderWorkflowClosed(o, t) && orderEventStartsTomorrow(o, t))
-      .map(o => ({
-        order: o,
-        client: clientById.get(o.clientId)?.name || '—',
-        when: upcomingOrderWhenLabel(o),
-      }));
-  }, [orders, clientById, t]);
-
-  const tomorrowVisits = useMemo(() => {
-    return (fieldVisits || [])
-      .filter(v => visitTouchesTomorrow(v, t))
-      .map(v => {
-        const { from, to } = fieldVisitRange(v);
-        return { v, rangeLabel: formatDateRangeEn(from, to) };
-      });
-  }, [fieldVisits, t]);
-
-  const pastDueOrders = useMemo(() => {
-    return orders
-      .filter(o => !isOrderWorkflowClosed(o, t) && orderPastDueWithBalance(o, t))
-      .map(o => {
-        const received = sumPayments(o.clientPayments);
-        const due = (Number(o.totalAmount) || 0) - received;
-        return {
-          order: o,
-          client: clientById.get(o.clientId)?.name || '—',
-          due: Math.max(0, due),
-          when: upcomingOrderWhenLabel(o),
-        };
-      })
-      .sort((a, b) => b.due - a.due);
-  }, [orders, clientById, t]);
-
   const thisWeekRangeText = useMemo(() => {
     const { weekStart, weekEnd } = calendarWeekRangeISO(t);
     return formatDateRangeEn(weekStart, weekEnd);
@@ -571,16 +510,7 @@ export default function DashboardScreen() {
 
   const weekOrdersPage = usePagedSlice(thisWeekOrderRows, listPageSize);
   const weekVisitsPage = usePagedSlice(thisWeekVisitRows, listPageSize);
-  const tomorrowOrdersPage = usePagedSlice(tomorrowOrders, listPageSize);
-  const tomorrowVisitsPage = usePagedSlice(tomorrowVisits, listPageSize);
-  const pastDuePage = usePagedSlice(pastDueOrders, listPageSize);
   const balancesPage = usePagedSlice(clientsWithBalanceDue, listPageSize);
-
-  const hasReminders =
-    tomorrowOrders.length > 0 ||
-    tomorrowVisits.length > 0 ||
-    pastDueOrders.length > 0;
-  const showReminderCard = !isFresh && (hasReminders || !notifAuth);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
@@ -728,142 +658,6 @@ export default function DashboardScreen() {
           </View>
         ) : null}
 
-        {showReminderCard ? (
-          <View style={styles.reminderCard}>
-            <Text style={styles.reminderTitle}>Reminders</Text>
-            {!notifAuth ? (
-              <View style={styles.reminderNotifBlock}>
-                <TouchableOpacity
-                  style={styles.reminderSettingsCta}
-                  onPress={() => navigateToDeskSettings(navigation)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.reminderSettingsCtaTitle}>Desk alerts are off</Text>
-                  <Text style={styles.reminderSettingsCtaSub}>
-                    Open Settings to turn on reminders for tomorrow&apos;s jobs and overdue payments.
-                  </Text>
-                </TouchableOpacity>
-                {notifDenied ? (
-                  <TouchableOpacity
-                    onPress={() => Linking.openSettings()}
-                    style={styles.reminderSettingsWrap}
-                  >
-                    <Text style={styles.reminderSettingsLink}>
-                      Notifications blocked — open system settings
-                    </Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.reminderOkRow}
-                onPress={() => navigateToDeskSettings(navigation)}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.reminderOk}>Phone alerts on</Text>
-                <Text style={styles.reminderOkHint}>Settings →</Text>
-              </TouchableOpacity>
-            )}
-            <Text style={styles.reminderLead}>
-              Jobs and balances that need attention soon.
-            </Text>
-            {tomorrowOrders.length > 0 ? (
-              <View style={styles.reminderBlock}>
-                <Text style={styles.reminderBlockTitle}>
-                  Tomorrow (
-                  {formatDateRangeEn(addDaysISO(t, 1), addDaysISO(t, 1))})
-                </Text>
-                {tomorrowOrdersPage.slice.map(({ order, client, when }) => (
-                  <TouchableOpacity
-                    key={order.id}
-                    style={styles.reminderRow}
-                    onPress={() => navigation.navigate('Orders')}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.reminderMain}>{order.title}</Text>
-                      <Text style={styles.reminderMuted}>{client}</Text>
-                    </View>
-                    {when ? (
-                      <Text style={styles.reminderMeta}>{when}</Text>
-                    ) : null}
-                  </TouchableOpacity>
-                ))}
-                <DashPaginationMobile
-                  page={tomorrowOrdersPage.page}
-                  pageCount={tomorrowOrdersPage.pageCount}
-                  total={tomorrowOrdersPage.total}
-                  pageSize={listPageSize}
-                  setPage={tomorrowOrdersPage.setPage}
-                  onPageSizeChange={setListPageSize}
-                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
-                />
-              </View>
-            ) : null}
-            {tomorrowVisits.length > 0 ? (
-              <View style={styles.reminderBlock}>
-                <Text style={styles.reminderBlockTitle}>
-                  My exposing tomorrow
-                </Text>
-                {tomorrowVisitsPage.slice.map(({ v, rangeLabel }) => (
-                  <TouchableOpacity
-                    key={v.id}
-                    style={styles.reminderRow}
-                    onPress={() => navigation.navigate('Field')}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.reminderMain}>{v.hostName}</Text>
-                      {v.venue ? (
-                        <Text style={styles.reminderMuted}>{v.venue}</Text>
-                      ) : null}
-                    </View>
-                    <Text style={styles.reminderMeta}>{rangeLabel}</Text>
-                  </TouchableOpacity>
-                ))}
-                <DashPaginationMobile
-                  page={tomorrowVisitsPage.page}
-                  pageCount={tomorrowVisitsPage.pageCount}
-                  total={tomorrowVisitsPage.total}
-                  pageSize={listPageSize}
-                  setPage={tomorrowVisitsPage.setPage}
-                  onPageSizeChange={setListPageSize}
-                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
-                />
-              </View>
-            ) : null}
-            {pastDueOrders.length > 0 ? (
-              <View style={styles.reminderBlock}>
-                <Text style={styles.reminderBlockTitle}>
-                  Collect payment (event over, balance left)
-                </Text>
-                {pastDuePage.slice.map(({ order, client, due, when }) => (
-                  <TouchableOpacity
-                    key={order.id}
-                    style={styles.reminderRow}
-                    onPress={() => navigation.navigate('Orders')}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.reminderMain}>{order.title}</Text>
-                      <Text style={styles.reminderMuted}>{client}</Text>
-                    </View>
-                    <Text style={[styles.reminderMeta, styles.warnText]}>
-                      {formatINR(due)} due
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                <DashPaginationMobile
-                  page={pastDuePage.page}
-                  pageCount={pastDuePage.pageCount}
-                  total={pastDuePage.total}
-                  pageSize={listPageSize}
-                  setPage={pastDuePage.setPage}
-                  onPageSizeChange={setListPageSize}
-                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
-                />
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-
         {isFresh ? (
           <View style={styles.welcome}>
             <Text style={styles.welcomeTitle}>Your desk is ready</Text>
@@ -982,97 +776,18 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {clientsWithBalanceDue.length > 0 || totalAllVisitsDueGrossAll > 0 ? (
-          <View style={styles.card} accessibilityLabel="Balances to collect">
-            <Text style={styles.cardTitle}>Balances to collect</Text>
-            <Text style={styles.cardSub}>
-              Studio = all client orders with balance left. My Exposing = gross still due on each visit (amount −
-              collected), all dates. Combined is a simple sum—not the same-person net on Pending (visits).
-            </Text>
-            <View style={styles.deskTotalBox}>
-              <View style={styles.deskTotalRow}>
-                <Text style={styles.deskTotalLabel}>Studio (all clients)</Text>
-                <Text style={styles.deskTotalSubval}>{formatINR(totalAllClientsStudioDue)}</Text>
-              </View>
-              <View style={styles.deskTotalRow}>
-                <Text style={styles.deskTotalLabel}>My Exposing (gross)</Text>
-                <Text style={styles.deskTotalSubval}>{formatINR(totalAllVisitsDueGrossAll)}</Text>
-              </View>
-              <View style={[styles.deskTotalRow, styles.deskTotalRowLast]}>
-                <Text style={styles.deskTotalLabelStrong}>Total desk</Text>
-                <Text style={styles.deskTotalGrand}>{formatINR(totalCollectStudioPlusExposingGross)}</Text>
-              </View>
-            </View>
-            {clientsWithBalanceDue.length > 0 ? (
-              <>
-                {balancesPage.slice.map((row, idx) => (
-                  <View
-                    key={row.clientId}
-                    style={[
-                      styles.clientBalRow,
-                      balancesPage.page === 1 && idx === 0 && styles.clientBalRowFirst,
-                    ]}
-                  >
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={styles.feedTitle}>{row.name}</Text>
-                      <Text style={styles.mutedSmall}>
-                        {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end', maxWidth: '42%' }}>
-                      <Text style={styles.feedDue}>{formatINR(row.dueSum)}</Text>
-                      <Text style={[styles.feedReceived, { textAlign: 'right' }]}>
-                        to collect
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-                <DashPaginationMobile
-                  page={balancesPage.page}
-                  pageCount={balancesPage.pageCount}
-                  total={balancesPage.total}
-                  pageSize={listPageSize}
-                  setPage={balancesPage.setPage}
-                  onPageSizeChange={setListPageSize}
-                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
-                />
-              </>
-            ) : (
-              <Text style={styles.mutedSmall}>
-                No studio balances by client right now. Use My Exposing for outside collections.
-              </Text>
-            )}
-            <View style={styles.balancesBtnRow}>
-              <TouchableOpacity
-                style={styles.cardFooterBtn}
-                onPress={() => navigation.navigate('Orders')}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.emptyBtnText}>Open orders</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.cardFooterBtnSecondary}
-                onPress={() => navigation.navigate('Field')}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.cardFooterBtnSecondaryText}>My Exposing</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : null}
-
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Upcoming orders</Text>
           <Text style={styles.cardSub}>
             Event still running or coming up (end today or later, or no event date). After the event, fully paid jobs
-            become Closed and leave. Past events with balance due show under Reminders.
+            become Closed and leave. Past events with balance due stay in Orders until paid.
           </Text>
           {futureOrderRows.length === 0 ? (
             <View style={styles.emptyInner}>
               <Text style={styles.emptyIcon}>✦</Text>
               <Text style={styles.emptyTitle}>No upcoming orders</Text>
               <Text style={styles.emptyText}>
-                Nothing in this window. Past events with payment due appear under Reminders → Collect payment.
+                Nothing in this window. Past events with payment due still show in Orders.
               </Text>
               <TouchableOpacity
                 style={styles.emptyBtn}
@@ -1187,6 +902,85 @@ export default function DashboardScreen() {
             </>
           )}
         </View>
+
+        {clientsWithBalanceDue.length > 0 || totalAllVisitsDueGrossAll > 0 ? (
+          <View style={styles.card} accessibilityLabel="Balances to collect">
+            <Text style={styles.cardTitle}>Balances to collect</Text>
+            <Text style={styles.cardSub}>
+              Studio = all client orders with balance left. My Exposing = gross still due on each visit (amount −
+              collected), all dates. Combined is a simple sum—not the same-person net on Pending (visits).
+            </Text>
+            <View style={styles.deskTotalBox}>
+              <View style={styles.deskTotalRow}>
+                <Text style={styles.deskTotalLabel}>Studio (all clients)</Text>
+                <Text style={styles.deskTotalSubval}>{formatINR(totalAllClientsStudioDue)}</Text>
+              </View>
+              <View style={styles.deskTotalRow}>
+                <Text style={styles.deskTotalLabel}>My Exposing (gross)</Text>
+                <Text style={styles.deskTotalSubval}>{formatINR(totalAllVisitsDueGrossAll)}</Text>
+              </View>
+              <View style={[styles.deskTotalRow, styles.deskTotalRowLast]}>
+                <Text style={styles.deskTotalLabelStrong}>Total desk</Text>
+                <Text style={styles.deskTotalGrand}>{formatINR(totalCollectStudioPlusExposingGross)}</Text>
+              </View>
+            </View>
+            {clientsWithBalanceDue.length > 0 ? (
+              <>
+                {balancesPage.slice.map((row, idx) => (
+                  <View
+                    key={row.clientId}
+                    style={[
+                      styles.clientBalRow,
+                      balancesPage.page === 1 && idx === 0 && styles.clientBalRowFirst,
+                    ]}
+                  >
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.feedTitle}>{row.name}</Text>
+                      <Text style={styles.mutedSmall}>
+                        {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', maxWidth: '42%' }}>
+                      <Text style={styles.feedDue}>{formatINR(row.dueSum)}</Text>
+                      <Text style={[styles.feedReceived, { textAlign: 'right' }]}>
+                        to collect
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+                <DashPaginationMobile
+                  page={balancesPage.page}
+                  pageCount={balancesPage.pageCount}
+                  total={balancesPage.total}
+                  pageSize={listPageSize}
+                  setPage={balancesPage.setPage}
+                  onPageSizeChange={setListPageSize}
+                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+                />
+              </>
+            ) : (
+              <Text style={styles.mutedSmall}>
+                No studio balances by client right now. Use My Exposing for outside collections.
+              </Text>
+            )}
+            <View style={styles.balancesBtnRow}>
+              <TouchableOpacity
+                style={styles.cardFooterBtn}
+                onPress={() => navigation.navigate('Orders')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.emptyBtnText}>Open orders</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cardFooterBtnSecondary}
+                onPress={() => navigation.navigate('Field')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.cardFooterBtnSecondaryText}>My Exposing</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Same-person net</Text>
@@ -1395,89 +1189,6 @@ const styles = StyleSheet.create({
   qaTextWrap: { flex: 1 },
   qaStrong: { fontSize: 16, fontWeight: '700', color: colors.text },
   qaSmall: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  reminderCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 16,
-  },
-  reminderTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
-  reminderNotifBlock: { marginBottom: 10 },
-  reminderSettingsCta: {
-    backgroundColor: colors.secondaryPillBg,
-    borderRadius: radius.sm,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  reminderSettingsCtaTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  reminderSettingsCtaSub: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 6,
-    lineHeight: 19,
-  },
-  reminderSettingsWrap: { marginTop: 12 },
-  reminderSettingsLink: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.primary,
-    textDecorationLine: 'underline',
-  },
-  reminderOkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-    marginBottom: 8,
-    gap: 8,
-  },
-  reminderOk: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.success,
-    flex: 1,
-  },
-  reminderOkHint: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  reminderLead: {
-    fontSize: 13,
-    color: colors.muted,
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  reminderBlock: { marginBottom: 12 },
-  reminderBlockTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.primary,
-    marginBottom: 8,
-  },
-  reminderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  reminderMain: { fontSize: 15, fontWeight: '600', color: colors.text },
-  reminderMuted: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  reminderMeta: {
-    fontSize: 12,
-    color: colors.muted,
-    marginLeft: 8,
-    maxWidth: 120,
-    textAlign: 'right',
-  },
   warnText: { color: colors.warn, fontWeight: '600' },
   okText: { color: colors.success, fontWeight: '600' },
   welcome: {

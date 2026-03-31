@@ -16,13 +16,7 @@ import {
   netVisitPendingAfterStudioPay,
   settlementNeedsLinkHint,
 } from '../utils/settlement'
-import {
-  addDaysISO,
-  localCalendarTodayISO,
-  orderEventStartsTomorrow,
-  orderPastDueWithBalance,
-  visitTouchesTomorrow,
-} from '../utils/reminders'
+import {localCalendarTodayISO} from '../utils/reminders'
 import {
   deriveOrderWorkflowStatus,
   isOrderWorkflowClosed,
@@ -135,7 +129,7 @@ function DashPagination({
         {start}-{end} of {total} {rowWord}
       </div>
       <div className="dash-pagination-bar__right">
-        <button
+        {/* <button
           type="button"
           className="dash-pagination-bar__icon-btn"
           aria-label="First page"
@@ -148,7 +142,7 @@ function DashPagination({
           <span className="dash-pagination-bar__chev" aria-hidden="true">
             ‹‹
           </span>
-        </button>
+        </button> */}
         <button
           type="button"
           className="dash-pagination-bar__nav"
@@ -188,7 +182,7 @@ function DashPagination({
             ›
           </span>
         </button>
-        <button
+        {/* <button
           type="button"
           className="dash-pagination-bar__icon-btn"
           aria-label="Last page"
@@ -201,7 +195,7 @@ function DashPagination({
           <span className="dash-pagination-bar__icon-last" aria-hidden="true">
             |
           </span>
-        </button>
+        </button> */}
       </div>
     </div>
   )
@@ -246,9 +240,6 @@ export default function Dashboard() {
   const {orders, clients, clientById, fieldVisits} = useStudio()
   const {setTab, setNavFocus} = useTab()
   const [listPageSize, setListPageSize] = useState(readStoredListPageSize)
-  const [notifPerm, setNotifPerm] = useState(() =>
-    typeof Notification !== 'undefined' ? Notification.permission : 'denied',
-  )
 
   useEffect(() => {
     try {
@@ -389,27 +380,6 @@ export default function Dashboard() {
     [orders, fieldVisits],
   )
 
-  const tomorrowOrders = useMemo(() => {
-    const t = todayISO()
-    return orders
-      .filter(o => !isOrderWorkflowClosed(o, t) && orderEventStartsTomorrow(o, t))
-      .map(o => ({
-        order: o,
-        client: clientById.get(o.clientId)?.name || '—',
-        when: upcomingOrderWhenLabel(o),
-      }))
-  }, [orders, clientById])
-
-  const tomorrowVisits = useMemo(() => {
-    const t = todayISO()
-    return (fieldVisits || [])
-      .filter(v => visitTouchesTomorrow(v, t))
-      .map(v => {
-        const {from, to} = fieldVisitRange(v)
-        return {v, rangeLabel: formatDateRangeEn(from, to)}
-      })
-  }, [fieldVisits])
-
   const thisWeekOrderRows = useMemo(() => {
     const t = todayISO()
     const {weekStart, weekEnd} = calendarWeekRangeISO(t)
@@ -449,41 +419,9 @@ export default function Dashboard() {
       )
   }, [fieldVisits])
 
-  const pastDueOrders = useMemo(() => {
-    const t = todayISO()
-    return orders
-      .filter(o => !isOrderWorkflowClosed(o, t) && orderPastDueWithBalance(o, t))
-      .map(o => {
-        const received = sumPayments(o.clientPayments)
-        const due = (Number(o.totalAmount) || 0) - received
-        return {
-          order: o,
-          client: clientById.get(o.clientId)?.name || '—',
-          due: Math.max(0, due),
-          when: upcomingOrderWhenLabel(o),
-        }
-      })
-      .sort((a, b) => b.due - a.due)
-  }, [orders, clientById])
-
   const weekOrdersPage = usePagedSlice(thisWeekOrderRows, listPageSize)
   const weekVisitsPage = usePagedSlice(thisWeekVisitRows, listPageSize)
-  const tomorrowOrdersPage = usePagedSlice(tomorrowOrders, listPageSize)
-  const tomorrowVisitsPage = usePagedSlice(tomorrowVisits, listPageSize)
-  const pastDuePage = usePagedSlice(pastDueOrders, listPageSize)
   const balancesPage = usePagedSlice(clientsWithBalanceDue, listPageSize)
-
-  const hasReminders =
-    tomorrowOrders.length > 0 || tomorrowVisits.length > 0 || pastDueOrders.length > 0
-
-  async function requestBrowserNotifications() {
-    if (typeof Notification === 'undefined') return
-    const r = await Notification.requestPermission()
-    setNotifPerm(r)
-  }
-
-  const showReminderCard =
-    !isFresh && (hasReminders || notifPerm === 'default')
 
   const tWeek = todayISO()
   const {weekStart: weekStartISO, weekEnd: weekEndISO} = calendarWeekRangeISO(tWeek)
@@ -625,120 +563,6 @@ export default function Dashboard() {
         </section>
       ) : null}
 
-      {showReminderCard ? (
-        <section className="card dash-reminders" aria-label="Reminders">
-          <div className="dash-reminders-head">
-            <h3 className="dash-reminders-title">Reminders</h3>
-            <div className="dash-reminders-actions">
-              {typeof Notification !== 'undefined' && notifPerm === 'default' ? (
-                <button type="button" className="btn btn-sm primary" onClick={requestBrowserNotifications}>
-                  Browser alerts
-                </button>
-              ) : null}
-            </div>
-            {typeof Notification !== 'undefined' && notifPerm === 'denied' ? (
-              <span className="muted small">Alerts blocked — allow notifications in browser settings.</span>
-            ) : null}
-            {notifPerm === 'granted' ? (
-              <span className="muted small dash-reminders-ok">Browser alerts on</span>
-            ) : null}
-          </div>
-          <p className="dash-reminders-lead muted small">
-            <strong>Browser alerts</strong> — system notifications while this tab stays open, up to{' '}
-            <strong>5 times per day</strong> per reminder type, with spacing so they do not stack.
-          </p>
-          {tomorrowOrders.length > 0 ? (
-            <div className="dash-reminder-block">
-              <h4 className="dash-reminder-block-title">
-                Tomorrow (
-                {formatDateRangeEn(addDaysISO(todayISO(), 1), addDaysISO(todayISO(), 1))})
-              </h4>
-              <ul className="dash-reminder-list">
-                {tomorrowOrdersPage.slice.map(({order, client, when}) => (
-                  <li key={order.id}>
-                    <button type="button" className="dash-reminder-row" onClick={() => setTab('orders')}>
-                      <span className="dash-reminder-main">
-                        <strong>{order.title}</strong>
-                        <span className="muted small">{client}</span>
-                      </span>
-                      <span className="dash-reminder-meta muted small">{when}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <DashPagination
-                page={tomorrowOrdersPage.page}
-                pageCount={tomorrowOrdersPage.pageCount}
-                total={tomorrowOrdersPage.total}
-                pageSize={listPageSize}
-                setPage={tomorrowOrdersPage.setPage}
-                onPageSizeChange={setListPageSize}
-                pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
-              />
-            </div>
-          ) : null}
-          {tomorrowVisits.length > 0 ? (
-            <div className="dash-reminder-block">
-              <h4 className="dash-reminder-block-title">My exposing tomorrow</h4>
-              <ul className="dash-reminder-list">
-                {tomorrowVisitsPage.slice.map(({v, rangeLabel}) => (
-                  <li key={v.id}>
-                    <button type="button" className="dash-reminder-row" onClick={() => setTab('field')}>
-                      <span className="dash-reminder-main">
-                        <strong>{v.hostName}</strong>
-                        {v.venue ? <span className="muted small">{v.venue}</span> : null}
-                      </span>
-                      <span className="dash-reminder-meta muted small">{rangeLabel}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <DashPagination
-                page={tomorrowVisitsPage.page}
-                pageCount={tomorrowVisitsPage.pageCount}
-                total={tomorrowVisitsPage.total}
-                pageSize={listPageSize}
-                setPage={tomorrowVisitsPage.setPage}
-                onPageSizeChange={setListPageSize}
-                pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
-              />
-            </div>
-          ) : null}
-          {pastDueOrders.length > 0 ? (
-            <div className="dash-reminder-block">
-              <h4 className="dash-reminder-block-title">Collect payment (event over, balance left)</h4>
-              <ul className="dash-reminder-list">
-                {pastDuePage.slice.map(({order, client, due, when}) => (
-                  <li key={order.id}>
-                    <button type="button" className="dash-reminder-row" onClick={() => setTab('orders')}>
-                      <span className="dash-reminder-main">
-                        <strong>{order.title}</strong>
-                        <span className="muted small">{client}</span>
-                      </span>
-                      <span className="dash-reminder-meta warn">{formatINR(due)} due</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <DashPagination
-                page={pastDuePage.page}
-                pageCount={pastDuePage.pageCount}
-                total={pastDuePage.total}
-                pageSize={listPageSize}
-                setPage={pastDuePage.setPage}
-                onPageSizeChange={setListPageSize}
-                pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
-              />
-            </div>
-          ) : null}
-          {!hasReminders && notifPerm === 'default' ? (
-            <p className="muted small" style={{margin: 0}}>
-              No list items right now. Turn on browser alerts to get pings when jobs or payments need attention.
-            </p>
-          ) : null}
-        </section>
-      ) : null}
-
       {isFresh ? (
         <div className="welcome-banner">
           <div className="welcome-banner-glow" aria-hidden="true" />
@@ -863,86 +687,13 @@ export default function Dashboard() {
       </div>
 
       <div className="dash-grid">
-        {clientsWithBalanceDue.length > 0 || totalAllVisitsDueGrossAll > 0 ? (
-          <section
-            className="card card-lift dash-card card-wide"
-            aria-label="Balances to collect"
-          >
-            <div className="dash-card-head">
-              <h3>Balances to collect</h3>
-              <p className="dash-card-subtitle">
-                <strong>Studio</strong> = all client orders with something left to collect.{' '}
-                <strong>My Exposing</strong> = gross still due on each outside visit (amount − collected), all dates.
-                Combined is a simple sum — not the &quot;same person&quot; net from the Pending (visits) tile.
-              </p>
-            </div>
-            <div className="dash-clients-grand-total dash-clients-grand-total--stack" role="status">
-              <div className="dash-clients-grand-total-row">
-                <span className="dash-clients-grand-total-label">Studio (all clients)</span>
-                <span className="dash-clients-grand-total-subval">{formatINR(totalAllClientsStudioDue)}</span>
-              </div>
-              <div className="dash-clients-grand-total-row">
-                <span className="dash-clients-grand-total-label">My Exposing (gross)</span>
-                <span className="dash-clients-grand-total-subval">{formatINR(totalAllVisitsDueGrossAll)}</span>
-              </div>
-              <div className="dash-clients-grand-total-row dash-clients-grand-total-row--total">
-                <span className="dash-clients-grand-total-label">Total desk</span>
-                <span className="dash-clients-grand-total-value">
-                  {formatINR(totalCollectStudioPlusExposingGross)}
-                </span>
-              </div>
-            </div>
-            {clientsWithBalanceDue.length > 0 ? (
-              <>
-                <ul className="dash-feed">
-                  {balancesPage.slice.map(row => (
-                    <li key={row.clientId} className="dash-feed-item dash-feed-item--client">
-                      <div>
-                        <div className="dash-feed-title">{row.name}</div>
-                        <div className="muted small">
-                          {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
-                        </div>
-                      </div>
-                      <div className="dash-feed-money">
-                        <div className="dash-feed-due">{formatINR(row.dueSum)}</div>
-                        <div className="dash-feed-received">to collect</div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                <DashPagination
-                  page={balancesPage.page}
-                  pageCount={balancesPage.pageCount}
-                  total={balancesPage.total}
-                  pageSize={listPageSize}
-                  setPage={balancesPage.setPage}
-                  onPageSizeChange={setListPageSize}
-                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
-                />
-              </>
-            ) : (
-              <p className="muted small" style={{margin: '0 0 0.75rem'}}>
-                No studio balances by client right now. Use <strong>My Exposing</strong> for outside collections.
-              </p>
-            )}
-            <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.35rem'}}>
-              <button type="button" className="btn primary btn-sm shine" onClick={() => setTab('orders')}>
-                Open orders
-              </button>
-              <button type="button" className="btn btn-sm" onClick={() => setTab('field')}>
-                My Exposing
-              </button>
-            </div>
-          </section>
-        ) : null}
-
         <section className="card card-lift dash-card">
           <div className="dash-card-head">
             <h3>Upcoming orders</h3>
             <p className="dash-card-subtitle">
               Jobs whose event is still running or coming up (end date today or later—or no event date yet). After the
               event, once fully paid, they become <strong>Closed</strong> and leave this list. Past events with a
-              balance due show under <strong>Reminders</strong>.
+              balance due stay in <strong>Orders</strong> until paid (status updates there).
             </p>
           </div>
           {futureOrderRows.length === 0 ? (
@@ -953,7 +704,7 @@ export default function Dashboard() {
               <p className="dash-empty-title">No upcoming orders</p>
               <p className="dash-empty-text">
                 Nothing on the calendar through today for open jobs. Orders with payment still due after the event
-                appear under <strong>Reminders → Collect payment</strong>.
+                still appear in <strong>Orders</strong> with amount due until settled.
               </p>
               <button
                 type="button"
@@ -1113,6 +864,79 @@ export default function Dashboard() {
             </>
           )}
         </section>
+
+        {clientsWithBalanceDue.length > 0 || totalAllVisitsDueGrossAll > 0 ? (
+          <section
+            className="card card-lift dash-card card-wide"
+            aria-label="Balances to collect"
+          >
+            <div className="dash-card-head">
+              <h3>Balances to collect</h3>
+              <p className="dash-card-subtitle">
+                <strong>Studio</strong> = all client orders with something left to collect.{' '}
+                <strong>My Exposing</strong> = gross still due on each outside visit (amount − collected), all dates.
+                Combined is a simple sum — not the &quot;same person&quot; net from the Pending (visits) tile.
+              </p>
+            </div>
+            <div className="dash-clients-grand-total dash-clients-grand-total--stack" role="status">
+              <div className="dash-clients-grand-total-row">
+                <span className="dash-clients-grand-total-label">Studio (all clients)</span>
+                <span className="dash-clients-grand-total-subval">{formatINR(totalAllClientsStudioDue)}</span>
+              </div>
+              <div className="dash-clients-grand-total-row">
+                <span className="dash-clients-grand-total-label">My Exposing (gross)</span>
+                <span className="dash-clients-grand-total-subval">{formatINR(totalAllVisitsDueGrossAll)}</span>
+              </div>
+              <div className="dash-clients-grand-total-row dash-clients-grand-total-row--total">
+                <span className="dash-clients-grand-total-label">Total desk</span>
+                <span className="dash-clients-grand-total-value">
+                  {formatINR(totalCollectStudioPlusExposingGross)}
+                </span>
+              </div>
+            </div>
+            {clientsWithBalanceDue.length > 0 ? (
+              <>
+                <ul className="dash-feed">
+                  {balancesPage.slice.map(row => (
+                    <li key={row.clientId} className="dash-feed-item dash-feed-item--client">
+                      <div>
+                        <div className="dash-feed-title">{row.name}</div>
+                        <div className="muted small">
+                          {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
+                        </div>
+                      </div>
+                      <div className="dash-feed-money">
+                        <div className="dash-feed-due">{formatINR(row.dueSum)}</div>
+                        <div className="dash-feed-received">to collect</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <DashPagination
+                  page={balancesPage.page}
+                  pageCount={balancesPage.pageCount}
+                  total={balancesPage.total}
+                  pageSize={listPageSize}
+                  setPage={balancesPage.setPage}
+                  onPageSizeChange={setListPageSize}
+                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+                />
+              </>
+            ) : (
+              <p className="muted small" style={{margin: '0 0 0.75rem'}}>
+                No studio balances by client right now. Use <strong>My Exposing</strong> for outside collections.
+              </p>
+            )}
+            <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.35rem'}}>
+              <button type="button" className="btn primary btn-sm shine" onClick={() => setTab('orders')}>
+                Open orders
+              </button>
+              <button type="button" className="btn btn-sm" onClick={() => setTab('field')}>
+                My Exposing
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="card card-lift dash-card card-wide dash-card--settle">
           <div className="dash-card-head">

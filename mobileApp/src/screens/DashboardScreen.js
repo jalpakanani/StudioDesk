@@ -1,10 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Linking,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -42,6 +44,246 @@ import {
   isOrderWorkflowClosed,
   orderWorkflowLabel,
 } from '../utils/orderWorkflow';
+
+const DASH_LIST_PAGE_SIZE_DEFAULT = 5;
+const DASH_LIST_PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 50, 100];
+const DASH_LIST_PAGE_SIZE_STORAGE = '@deskDashboardListPageSize';
+
+function usePagedSlice(items, pageSize = DASH_LIST_PAGE_SIZE_DEFAULT) {
+  const [page, setPage] = useState(1);
+  const total = items.length;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize) || 1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [pageSize]);
+
+  useEffect(() => {
+    setPage(p => Math.min(Math.max(1, p), pageCount));
+  }, [pageCount]);
+
+  const slice = useMemo(() => {
+    const p = Math.min(Math.max(1, page), pageCount);
+    const start = (p - 1) * pageSize;
+    return items.slice(start, start + pageSize);
+  }, [items, page, pageSize, pageCount]);
+
+  const safePage = Math.min(Math.max(1, page), pageCount);
+
+  return {
+    page: safePage,
+    setPage,
+    pageCount,
+    slice,
+    total,
+  };
+}
+
+function DashPaginationMobile({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  setPage,
+  onPageSizeChange,
+  pageSizeOptions,
+}) {
+  const [jumpDraft, setJumpDraft] = useState(() => String(page));
+
+  useEffect(() => {
+    setJumpDraft(String(page));
+  }, [page]);
+
+  if (total === 0) return null;
+
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(page * pageSize, total);
+
+  function commitJump() {
+    const n = parseInt(jumpDraft, 10);
+    if (!Number.isFinite(n)) {
+      setJumpDraft(String(page));
+      return;
+    }
+    const c = Math.min(Math.max(1, n), pageCount);
+    setPage(c);
+    setJumpDraft(String(c));
+  }
+
+  return (
+    <View style={pagStyles.wrap}>
+      <View style={pagStyles.rppRow}>
+        <Text style={pagStyles.rppLabel}>Rows per page</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={pagStyles.rppChipsInner}
+        >
+          {pageSizeOptions.map(n => (
+            <TouchableOpacity
+              key={n}
+              style={[pagStyles.rppChip, pageSize === n && pagStyles.rppChipOn]}
+              onPress={() => onPageSizeChange(n)}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={[pagStyles.rppChipTxt, pageSize === n && pagStyles.rppChipTxtOn]}
+              >
+                {n}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+      <Text style={pagStyles.range}>
+        {start}-{end} of {total} {total === 1 ? 'row' : 'rows'}
+      </Text>
+      <View style={pagStyles.navRow}>
+        <TouchableOpacity
+          style={pagStyles.iconBtn}
+          disabled={page <= 1}
+          onPress={() => setPage(1)}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+        >
+          <Text style={[pagStyles.iconBtnTxt, page <= 1 && pagStyles.iconBtnTxtOff]}>
+            |‹‹
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          disabled={page <= 1}
+          onPress={() => setPage(p => Math.max(1, p - 1))}
+          style={pagStyles.navTxtBtn}
+        >
+          <Text style={[pagStyles.navLink, page <= 1 && pagStyles.navLinkOff]}>
+            ‹ Previous
+          </Text>
+        </TouchableOpacity>
+        <TextInput
+          style={pagStyles.jump}
+          value={jumpDraft}
+          onChangeText={t => setJumpDraft(t.replace(/\D/g, ''))}
+          onBlur={commitJump}
+          onSubmitEditing={commitJump}
+          keyboardType="number-pad"
+          returnKeyType="done"
+          selectTextOnFocus
+        />
+        <Text style={pagStyles.ofText}>of {pageCount}</Text>
+        <TouchableOpacity
+          disabled={page >= pageCount}
+          onPress={() => setPage(p => Math.min(pageCount, p + 1))}
+          style={pagStyles.navTxtBtn}
+        >
+          <Text style={[pagStyles.navLink, page >= pageCount && pagStyles.navLinkOff]}>
+            Next ›
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={pagStyles.iconBtn}
+          disabled={page >= pageCount}
+          onPress={() => setPage(pageCount)}
+          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+        >
+          <Text style={[pagStyles.iconBtnTxt, page >= pageCount && pagStyles.iconBtnTxtOff]}>
+            ››|
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const pagStyles = StyleSheet.create({
+  wrap: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    gap: 10,
+  },
+  rppRow: { gap: 8 },
+  rppLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.muted,
+  },
+  rppChipsInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 2,
+  },
+  rppChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+  },
+  rppChipOn: {
+    borderColor: colors.primary,
+    backgroundColor: colors.secondaryPillBg,
+  },
+  rppChipTxt: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  rppChipTxtOn: { color: colors.primary },
+  range: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.muted,
+  },
+  navRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
+  iconBtn: {
+    minWidth: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  iconBtnTxt: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: -0.5,
+  },
+  iconBtnTxtOff: { color: colors.muted, opacity: 0.5 },
+  navTxtBtn: { paddingVertical: 6, paddingHorizontal: 4 },
+  navLink: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  navLinkOff: { color: colors.muted, opacity: 0.55 },
+  jump: {
+    width: 44,
+    height: 36,
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: 8,
+    backgroundColor: colors.inputBg,
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+  },
+  ofText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.muted,
+    marginHorizontal: 2,
+  },
+});
 
 function todayISO() {
   return localCalendarTodayISO();
@@ -83,6 +325,29 @@ export default function DashboardScreen() {
   const { orders, clients, clientById, fieldVisits, syncError } = useStudio();
   const [notifAuth, setNotifAuth] = useState(false);
   const [notifDenied, setNotifDenied] = useState(false);
+  const [listPageSize, setListPageSize] = useState(DASH_LIST_PAGE_SIZE_DEFAULT);
+
+  useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(DASH_LIST_PAGE_SIZE_STORAGE)
+      .then(raw => {
+        if (cancelled || raw == null) return;
+        const n = Number(raw);
+        if (DASH_LIST_PAGE_SIZE_OPTIONS.includes(n)) {
+          setListPageSize(n);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem(DASH_LIST_PAGE_SIZE_STORAGE, String(listPageSize)).catch(
+      () => {},
+    );
+  }, [listPageSize]);
 
   useFocusEffect(
     useCallback(() => {
@@ -148,6 +413,11 @@ export default function DashboardScreen() {
       .sort((a, b) => b.dueSum - a.dueSum);
   }, [orders, clientById]);
 
+  const totalAllClientsStudioDue = useMemo(
+    () => clientsWithBalanceDue.reduce((s, r) => s + r.dueSum, 0),
+    [clientsWithBalanceDue],
+  );
+
   const visitBalances = useMemo(() => {
     return (fieldVisits || []).map(v => {
       const received = sumPayments(v.collections);
@@ -155,6 +425,16 @@ export default function DashboardScreen() {
       return { v, received, due: total - received };
     });
   }, [fieldVisits]);
+
+  const totalAllVisitsDueGrossAll = useMemo(
+    () => visitBalances.reduce((s, x) => s + Math.max(0, x.due), 0),
+    [visitBalances],
+  );
+
+  const totalCollectStudioPlusExposingGross = useMemo(
+    () => totalAllClientsStudioDue + totalAllVisitsDueGrossAll,
+    [totalAllClientsStudioDue, totalAllVisitsDueGrossAll],
+  );
 
   const totalVisitDueGross = useMemo(() => {
     return visitBalances.reduce((s, x) => {
@@ -289,6 +569,13 @@ export default function DashboardScreen() {
       );
   }, [fieldVisits, t]);
 
+  const weekOrdersPage = usePagedSlice(thisWeekOrderRows, listPageSize);
+  const weekVisitsPage = usePagedSlice(thisWeekVisitRows, listPageSize);
+  const tomorrowOrdersPage = usePagedSlice(tomorrowOrders, listPageSize);
+  const tomorrowVisitsPage = usePagedSlice(tomorrowVisits, listPageSize);
+  const pastDuePage = usePagedSlice(pastDueOrders, listPageSize);
+  const balancesPage = usePagedSlice(clientsWithBalanceDue, listPageSize);
+
   const hasReminders =
     tomorrowOrders.length > 0 ||
     tomorrowVisits.length > 0 ||
@@ -376,7 +663,7 @@ export default function DashboardScreen() {
             {thisWeekOrderRows.length > 0 ? (
               <View style={styles.weekBlock}>
                 <Text style={styles.weekBlockTitle}>Orders</Text>
-                {thisWeekOrderRows.map(({ order, client, when }) => (
+                {weekOrdersPage.slice.map(({ order, client, when }) => (
                   <TouchableOpacity
                     key={order.id}
                     style={styles.weekRow}
@@ -396,12 +683,21 @@ export default function DashboardScreen() {
                     ) : null}
                   </TouchableOpacity>
                 ))}
+                <DashPaginationMobile
+                  page={weekOrdersPage.page}
+                  pageCount={weekOrdersPage.pageCount}
+                  total={weekOrdersPage.total}
+                  pageSize={listPageSize}
+                  setPage={weekOrdersPage.setPage}
+                  onPageSizeChange={setListPageSize}
+                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+                />
               </View>
             ) : null}
             {thisWeekVisitRows.length > 0 ? (
               <View style={styles.weekBlock}>
                 <Text style={styles.weekBlockTitle}>My Exposing</Text>
-                {thisWeekVisitRows.map(({ v, rangeLabel }) => (
+                {weekVisitsPage.slice.map(({ v, rangeLabel }) => (
                   <TouchableOpacity
                     key={v.id}
                     style={styles.weekRow}
@@ -418,6 +714,15 @@ export default function DashboardScreen() {
                     <Text style={styles.weekRowMeta}>{rangeLabel}</Text>
                   </TouchableOpacity>
                 ))}
+                <DashPaginationMobile
+                  page={weekVisitsPage.page}
+                  pageCount={weekVisitsPage.pageCount}
+                  total={weekVisitsPage.total}
+                  pageSize={listPageSize}
+                  setPage={weekVisitsPage.setPage}
+                  onPageSizeChange={setListPageSize}
+                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+                />
               </View>
             ) : null}
           </View>
@@ -468,7 +773,7 @@ export default function DashboardScreen() {
                   Tomorrow (
                   {formatDateRangeEn(addDaysISO(t, 1), addDaysISO(t, 1))})
                 </Text>
-                {tomorrowOrders.map(({ order, client, when }) => (
+                {tomorrowOrdersPage.slice.map(({ order, client, when }) => (
                   <TouchableOpacity
                     key={order.id}
                     style={styles.reminderRow}
@@ -483,6 +788,15 @@ export default function DashboardScreen() {
                     ) : null}
                   </TouchableOpacity>
                 ))}
+                <DashPaginationMobile
+                  page={tomorrowOrdersPage.page}
+                  pageCount={tomorrowOrdersPage.pageCount}
+                  total={tomorrowOrdersPage.total}
+                  pageSize={listPageSize}
+                  setPage={tomorrowOrdersPage.setPage}
+                  onPageSizeChange={setListPageSize}
+                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+                />
               </View>
             ) : null}
             {tomorrowVisits.length > 0 ? (
@@ -490,7 +804,7 @@ export default function DashboardScreen() {
                 <Text style={styles.reminderBlockTitle}>
                   My exposing tomorrow
                 </Text>
-                {tomorrowVisits.map(({ v, rangeLabel }) => (
+                {tomorrowVisitsPage.slice.map(({ v, rangeLabel }) => (
                   <TouchableOpacity
                     key={v.id}
                     style={styles.reminderRow}
@@ -505,6 +819,15 @@ export default function DashboardScreen() {
                     <Text style={styles.reminderMeta}>{rangeLabel}</Text>
                   </TouchableOpacity>
                 ))}
+                <DashPaginationMobile
+                  page={tomorrowVisitsPage.page}
+                  pageCount={tomorrowVisitsPage.pageCount}
+                  total={tomorrowVisitsPage.total}
+                  pageSize={listPageSize}
+                  setPage={tomorrowVisitsPage.setPage}
+                  onPageSizeChange={setListPageSize}
+                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+                />
               </View>
             ) : null}
             {pastDueOrders.length > 0 ? (
@@ -512,7 +835,7 @@ export default function DashboardScreen() {
                 <Text style={styles.reminderBlockTitle}>
                   Collect payment (event over, balance left)
                 </Text>
-                {pastDueOrders.map(({ order, client, due, when }) => (
+                {pastDuePage.slice.map(({ order, client, due, when }) => (
                   <TouchableOpacity
                     key={order.id}
                     style={styles.reminderRow}
@@ -527,6 +850,15 @@ export default function DashboardScreen() {
                     </Text>
                   </TouchableOpacity>
                 ))}
+                <DashPaginationMobile
+                  page={pastDuePage.page}
+                  pageCount={pastDuePage.pageCount}
+                  total={pastDuePage.total}
+                  pageSize={listPageSize}
+                  setPage={pastDuePage.setPage}
+                  onPageSizeChange={setListPageSize}
+                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+                />
               </View>
             ) : null}
           </View>
@@ -593,6 +925,19 @@ export default function DashboardScreen() {
             </Text>
             <Text style={styles.statHint}>Open jobs — closed hidden</Text>
           </View>
+          <View
+            style={[styles.statTile, styles.statTileStatic, styles.statTileFullWidth]}
+            accessibilityLabel={`To collect desk total ${formatINR(totalCollectStudioPlusExposingGross)}`}
+          >
+            <Text style={styles.statLabel}>To collect (desk)</Text>
+            <Text style={[styles.statValue, styles.statMoney, styles.warnText]}>
+              {formatINR(totalCollectStudioPlusExposingGross)}
+            </Text>
+            <Text style={styles.statHint}>
+              Studio {formatINR(totalAllClientsStudioDue)} + exposing{' '}
+              {formatINR(totalAllVisitsDueGrossAll)} · gross
+            </Text>
+          </View>
           <View style={[styles.statTile, styles.statTileStatic]}>
             <Text style={styles.statLabel}>Est. profit (all time)</Text>
             <Text
@@ -637,36 +982,82 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {clientsWithBalanceDue.length > 0 ? (
-          <View style={styles.card} accessibilityLabel="Clients with balance due">
-            <Text style={styles.cardTitle}>Clients with balance due</Text>
+        {clientsWithBalanceDue.length > 0 || totalAllVisitsDueGrossAll > 0 ? (
+          <View style={styles.card} accessibilityLabel="Balances to collect">
+            <Text style={styles.cardTitle}>Balances to collect</Text>
             <Text style={styles.cardSub}>
-              All orders where something is still to collect—grouped by client. Open Orders to add a payment.
+              Studio = all client orders with balance left. My Exposing = gross still due on each visit (amount −
+              collected), all dates. Combined is a simple sum—not the same-person net on Pending (visits).
             </Text>
-            {clientsWithBalanceDue.map((row, idx) => (
-              <View
-                key={row.clientId}
-                style={[styles.clientBalRow, idx === 0 && styles.clientBalRowFirst]}
-              >
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.feedTitle}>{row.name}</Text>
-                  <Text style={styles.mutedSmall}>
-                    {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end', maxWidth: '42%' }}>
-                  <Text style={styles.feedDue}>{formatINR(row.dueSum)}</Text>
-                  <Text style={[styles.feedReceived, { textAlign: 'right' }]}>to collect</Text>
-                </View>
+            <View style={styles.deskTotalBox}>
+              <View style={styles.deskTotalRow}>
+                <Text style={styles.deskTotalLabel}>Studio (all clients)</Text>
+                <Text style={styles.deskTotalSubval}>{formatINR(totalAllClientsStudioDue)}</Text>
               </View>
-            ))}
-            <TouchableOpacity
-              style={styles.cardFooterBtn}
-              onPress={() => navigation.navigate('Orders')}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.emptyBtnText}>Open orders</Text>
-            </TouchableOpacity>
+              <View style={styles.deskTotalRow}>
+                <Text style={styles.deskTotalLabel}>My Exposing (gross)</Text>
+                <Text style={styles.deskTotalSubval}>{formatINR(totalAllVisitsDueGrossAll)}</Text>
+              </View>
+              <View style={[styles.deskTotalRow, styles.deskTotalRowLast]}>
+                <Text style={styles.deskTotalLabelStrong}>Total desk</Text>
+                <Text style={styles.deskTotalGrand}>{formatINR(totalCollectStudioPlusExposingGross)}</Text>
+              </View>
+            </View>
+            {clientsWithBalanceDue.length > 0 ? (
+              <>
+                {balancesPage.slice.map((row, idx) => (
+                  <View
+                    key={row.clientId}
+                    style={[
+                      styles.clientBalRow,
+                      balancesPage.page === 1 && idx === 0 && styles.clientBalRowFirst,
+                    ]}
+                  >
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={styles.feedTitle}>{row.name}</Text>
+                      <Text style={styles.mutedSmall}>
+                        {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', maxWidth: '42%' }}>
+                      <Text style={styles.feedDue}>{formatINR(row.dueSum)}</Text>
+                      <Text style={[styles.feedReceived, { textAlign: 'right' }]}>
+                        to collect
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+                <DashPaginationMobile
+                  page={balancesPage.page}
+                  pageCount={balancesPage.pageCount}
+                  total={balancesPage.total}
+                  pageSize={listPageSize}
+                  setPage={balancesPage.setPage}
+                  onPageSizeChange={setListPageSize}
+                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+                />
+              </>
+            ) : (
+              <Text style={styles.mutedSmall}>
+                No studio balances by client right now. Use My Exposing for outside collections.
+              </Text>
+            )}
+            <View style={styles.balancesBtnRow}>
+              <TouchableOpacity
+                style={styles.cardFooterBtn}
+                onPress={() => navigation.navigate('Orders')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.emptyBtnText}>Open orders</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cardFooterBtnSecondary}
+                onPress={() => navigation.navigate('Field')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.cardFooterBtnSecondaryText}>My Exposing</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ) : null}
 
@@ -1141,6 +1532,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   statTileStatic: { opacity: 1 },
+  statTileFullWidth: {
+    width: '100%',
+    backgroundColor: colors.secondaryPillBg,
+    borderColor: 'rgba(194, 65, 12, 0.22)',
+  },
   statLabel: { fontSize: 12, color: colors.muted },
   statValue: {
     fontSize: 20,
@@ -1167,6 +1563,53 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 17, fontWeight: '800', color: colors.text },
   cardSub: { fontSize: 13, color: colors.muted, marginTop: 6, lineHeight: 19 },
+  deskTotalBox: {
+    marginTop: 4,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 6,
+  },
+  deskTotalRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  deskTotalRowLast: {
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  deskTotalLabel: { fontSize: 13, color: colors.text, fontWeight: '600', flex: 1 },
+  deskTotalLabelStrong: { fontSize: 14, color: colors.text, fontWeight: '800' },
+  deskTotalSubval: { fontSize: 15, fontWeight: '700', color: colors.text, fontVariant: ['tabular-nums'] },
+  deskTotalGrand: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.warn,
+    fontVariant: ['tabular-nums'],
+  },
+  balancesBtnRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 12,
+    alignItems: 'center',
+  },
+  cardFooterBtnSecondary: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceSolid,
+  },
+  cardFooterBtnSecondaryText: { color: colors.text, fontWeight: '700', fontSize: 14 },
   clientBalRow: {
     flexDirection: 'row',
     alignItems: 'center',

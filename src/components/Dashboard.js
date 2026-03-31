@@ -1,4 +1,4 @@
-import {useMemo, useState} from 'react'
+import {useEffect, useId, useMemo, useState} from 'react'
 import {useStudio} from '../context/StudioContext'
 import {useTab} from '../context/TabContext'
 import {formatINR, sumPayments} from '../utils/money'
@@ -31,6 +31,180 @@ import {
 
 function todayISO() {
   return localCalendarTodayISO()
+}
+
+const DASH_LIST_PAGE_SIZE_DEFAULT = 5
+const DASH_LIST_PAGE_SIZE_OPTIONS = [5, 10, 15, 20, 25, 50, 100]
+const DASH_LIST_PAGE_SIZE_STORAGE = 'deskDashboardListPageSize'
+
+function readStoredListPageSize() {
+  if (typeof localStorage === 'undefined') return DASH_LIST_PAGE_SIZE_DEFAULT
+  try {
+    const raw = localStorage.getItem(DASH_LIST_PAGE_SIZE_STORAGE)
+    const n = Number(raw)
+    if (DASH_LIST_PAGE_SIZE_OPTIONS.includes(n)) return n
+  } catch {
+    /* ignore */
+  }
+  return DASH_LIST_PAGE_SIZE_DEFAULT
+}
+
+function usePagedSlice(items, pageSize = DASH_LIST_PAGE_SIZE_DEFAULT) {
+  const [page, setPage] = useState(1)
+  const total = items.length
+  const pageCount = Math.max(1, Math.ceil(total / pageSize) || 1)
+
+  useEffect(() => {
+    setPage(1)
+  }, [pageSize])
+
+  useEffect(() => {
+    setPage(p => Math.min(Math.max(1, p), pageCount))
+  }, [pageCount])
+
+  const slice = useMemo(() => {
+    const p = Math.min(Math.max(1, page), pageCount)
+    const start = (p - 1) * pageSize
+    return items.slice(start, start + pageSize)
+  }, [items, page, pageSize, pageCount])
+
+  const safePage = Math.min(Math.max(1, page), pageCount)
+
+  return {
+    page: safePage,
+    setPage,
+    pageCount,
+    slice,
+    total,
+  }
+}
+
+function DashPagination({
+  page,
+  pageCount,
+  total,
+  pageSize,
+  setPage,
+  onPageSizeChange,
+  pageSizeOptions,
+}) {
+  const selectId = useId()
+  const [jumpDraft, setJumpDraft] = useState(() => String(page))
+
+  useEffect(() => {
+    setJumpDraft(String(page))
+  }, [page])
+
+  if (total === 0) return null
+
+  const start = (page - 1) * pageSize + 1
+  const end = Math.min(page * pageSize, total)
+  const rowWord = total === 1 ? 'row' : 'rows'
+
+  function commitJump() {
+    const n = parseInt(jumpDraft, 10)
+    if (!Number.isFinite(n)) {
+      setJumpDraft(String(page))
+      return
+    }
+    const clamped = Math.min(Math.max(1, n), pageCount)
+    setPage(clamped)
+    setJumpDraft(String(clamped))
+  }
+
+  return (
+    <div className="dash-pagination-bar" role="navigation" aria-label="Table pagination">
+      <div className="dash-pagination-bar__left">
+        <label htmlFor={selectId} className="dash-pagination-bar__rpp-label muted small">
+          Rows per page
+        </label>
+        <select
+          id={selectId}
+          className="dash-pagination-bar__rpp-select"
+          value={pageSize}
+          onChange={e => onPageSizeChange(Number(e.target.value))}
+        >
+          {pageSizeOptions.map(n => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="dash-pagination-bar__range muted small">
+        {start}-{end} of {total} {rowWord}
+      </div>
+      <div className="dash-pagination-bar__right">
+        <button
+          type="button"
+          className="dash-pagination-bar__icon-btn"
+          aria-label="First page"
+          disabled={page <= 1}
+          onClick={() => setPage(1)}
+        >
+          <span className="dash-pagination-bar__icon-first" aria-hidden="true">
+            |
+          </span>
+          <span className="dash-pagination-bar__chev" aria-hidden="true">
+            ‹‹
+          </span>
+        </button>
+        <button
+          type="button"
+          className="dash-pagination-bar__nav"
+          disabled={page <= 1}
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+        >
+          <span className="dash-pagination-bar__chev" aria-hidden="true">
+            ‹
+          </span>{' '}
+          Previous
+        </button>
+        <input
+          className="dash-pagination-bar__jump"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          value={jumpDraft}
+          onChange={e => setJumpDraft(e.target.value.replace(/\D/g, ''))}
+          onBlur={commitJump}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              commitJump()
+            }
+          }}
+          aria-label="Go to page"
+        />
+        <span className="dash-pagination-bar__of muted small">of {pageCount}</span>
+        <button
+          type="button"
+          className="dash-pagination-bar__nav"
+          disabled={page >= pageCount}
+          onClick={() => setPage(p => Math.min(pageCount, p + 1))}
+        >
+          Next{' '}
+          <span className="dash-pagination-bar__chev" aria-hidden="true">
+            ›
+          </span>
+        </button>
+        <button
+          type="button"
+          className="dash-pagination-bar__icon-btn"
+          aria-label="Last page"
+          disabled={page >= pageCount}
+          onClick={() => setPage(pageCount)}
+        >
+          <span className="dash-pagination-bar__chev" aria-hidden="true">
+            ››
+          </span>
+          <span className="dash-pagination-bar__icon-last" aria-hidden="true">
+            |
+          </span>
+        </button>
+      </div>
+    </div>
+  )
 }
 
 /** Event / job still in the future (uses event to-date, else order date). Undated orders stay visible. */
@@ -71,9 +245,18 @@ function upcomingOrderWhenLabel(order) {
 export default function Dashboard() {
   const {orders, clients, clientById, fieldVisits} = useStudio()
   const {setTab, setNavFocus} = useTab()
+  const [listPageSize, setListPageSize] = useState(readStoredListPageSize)
   const [notifPerm, setNotifPerm] = useState(() =>
     typeof Notification !== 'undefined' ? Notification.permission : 'denied',
   )
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DASH_LIST_PAGE_SIZE_STORAGE, String(listPageSize))
+    } catch {
+      /* ignore */
+    }
+  }, [listPageSize])
   const todayDesk = todayISO()
   const futureOrderRows = useMemo(() => {
     return orders
@@ -123,6 +306,12 @@ export default function Dashboard() {
       .sort((a, b) => b.dueSum - a.dueSum)
   }, [orders, clientById])
 
+  /** Sum of all studio order balances by client (not “same person” visit netting). */
+  const totalAllClientsStudioDue = useMemo(
+    () => clientsWithBalanceDue.reduce((s, r) => s + r.dueSum, 0),
+    [clientsWithBalanceDue],
+  )
+
   const visitBalances = useMemo(() => {
     return (fieldVisits || []).map(v => {
       const received = sumPayments(v.collections)
@@ -130,6 +319,18 @@ export default function Dashboard() {
       return {v, received, due: total - received}
     })
   }, [fieldVisits])
+
+  /** Gross still due on every My Exposing row (amount − collected), any date. */
+  const totalAllVisitsDueGrossAll = useMemo(
+    () => visitBalances.reduce((s, x) => s + Math.max(0, x.due), 0),
+    [visitBalances],
+  )
+
+  /** Studio client balances + exposing gross (simple sum — not same-person net). */
+  const totalCollectStudioPlusExposingGross = useMemo(
+    () => totalAllClientsStudioDue + totalAllVisitsDueGrossAll,
+    [totalAllClientsStudioDue, totalAllVisitsDueGrossAll],
+  )
 
   /** Gross still due on upcoming visits (before netting studio pay to same person). */
   const totalVisitDueGross = useMemo(() => {
@@ -265,6 +466,13 @@ export default function Dashboard() {
       .sort((a, b) => b.due - a.due)
   }, [orders, clientById])
 
+  const weekOrdersPage = usePagedSlice(thisWeekOrderRows, listPageSize)
+  const weekVisitsPage = usePagedSlice(thisWeekVisitRows, listPageSize)
+  const tomorrowOrdersPage = usePagedSlice(tomorrowOrders, listPageSize)
+  const tomorrowVisitsPage = usePagedSlice(tomorrowVisits, listPageSize)
+  const pastDuePage = usePagedSlice(pastDueOrders, listPageSize)
+  const balancesPage = usePagedSlice(clientsWithBalanceDue, listPageSize)
+
   const hasReminders =
     tomorrowOrders.length > 0 || tomorrowVisits.length > 0 || pastDueOrders.length > 0
 
@@ -348,7 +556,7 @@ export default function Dashboard() {
             <div className="dash-week-block">
               <h4 className="dash-week-block-title">Orders</h4>
               <ul className="dash-reminder-list">
-                {thisWeekOrderRows.map(({order, client, when}) => (
+                {weekOrdersPage.slice.map(({order, client, when}) => (
                   <li key={order.id}>
                     <button
                       type="button"
@@ -367,13 +575,22 @@ export default function Dashboard() {
                   </li>
                 ))}
               </ul>
+              <DashPagination
+                page={weekOrdersPage.page}
+                pageCount={weekOrdersPage.pageCount}
+                total={weekOrdersPage.total}
+                pageSize={listPageSize}
+                setPage={weekOrdersPage.setPage}
+                onPageSizeChange={setListPageSize}
+                pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+              />
             </div>
           ) : null}
           {thisWeekVisitRows.length > 0 ? (
             <div className="dash-week-block">
               <h4 className="dash-week-block-title">My Exposing</h4>
               <ul className="dash-reminder-list">
-                {thisWeekVisitRows.map(({v, rangeLabel}) => (
+                {weekVisitsPage.slice.map(({v, rangeLabel}) => (
                   <li key={v.id}>
                     <button
                       type="button"
@@ -394,6 +611,15 @@ export default function Dashboard() {
                   </li>
                 ))}
               </ul>
+              <DashPagination
+                page={weekVisitsPage.page}
+                pageCount={weekVisitsPage.pageCount}
+                total={weekVisitsPage.total}
+                pageSize={listPageSize}
+                setPage={weekVisitsPage.setPage}
+                onPageSizeChange={setListPageSize}
+                pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+              />
             </div>
           ) : null}
         </section>
@@ -428,7 +654,7 @@ export default function Dashboard() {
                 {formatDateRangeEn(addDaysISO(todayISO(), 1), addDaysISO(todayISO(), 1))})
               </h4>
               <ul className="dash-reminder-list">
-                {tomorrowOrders.map(({order, client, when}) => (
+                {tomorrowOrdersPage.slice.map(({order, client, when}) => (
                   <li key={order.id}>
                     <button type="button" className="dash-reminder-row" onClick={() => setTab('orders')}>
                       <span className="dash-reminder-main">
@@ -440,13 +666,22 @@ export default function Dashboard() {
                   </li>
                 ))}
               </ul>
+              <DashPagination
+                page={tomorrowOrdersPage.page}
+                pageCount={tomorrowOrdersPage.pageCount}
+                total={tomorrowOrdersPage.total}
+                pageSize={listPageSize}
+                setPage={tomorrowOrdersPage.setPage}
+                onPageSizeChange={setListPageSize}
+                pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+              />
             </div>
           ) : null}
           {tomorrowVisits.length > 0 ? (
             <div className="dash-reminder-block">
               <h4 className="dash-reminder-block-title">My exposing tomorrow</h4>
               <ul className="dash-reminder-list">
-                {tomorrowVisits.map(({v, rangeLabel}) => (
+                {tomorrowVisitsPage.slice.map(({v, rangeLabel}) => (
                   <li key={v.id}>
                     <button type="button" className="dash-reminder-row" onClick={() => setTab('field')}>
                       <span className="dash-reminder-main">
@@ -458,13 +693,22 @@ export default function Dashboard() {
                   </li>
                 ))}
               </ul>
+              <DashPagination
+                page={tomorrowVisitsPage.page}
+                pageCount={tomorrowVisitsPage.pageCount}
+                total={tomorrowVisitsPage.total}
+                pageSize={listPageSize}
+                setPage={tomorrowVisitsPage.setPage}
+                onPageSizeChange={setListPageSize}
+                pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+              />
             </div>
           ) : null}
           {pastDueOrders.length > 0 ? (
             <div className="dash-reminder-block">
               <h4 className="dash-reminder-block-title">Collect payment (event over, balance left)</h4>
               <ul className="dash-reminder-list">
-                {pastDueOrders.map(({order, client, due, when}) => (
+                {pastDuePage.slice.map(({order, client, due, when}) => (
                   <li key={order.id}>
                     <button type="button" className="dash-reminder-row" onClick={() => setTab('orders')}>
                       <span className="dash-reminder-main">
@@ -476,6 +720,15 @@ export default function Dashboard() {
                   </li>
                 ))}
               </ul>
+              <DashPagination
+                page={pastDuePage.page}
+                pageCount={pastDuePage.pageCount}
+                total={pastDuePage.total}
+                pageSize={listPageSize}
+                setPage={pastDuePage.setPage}
+                onPageSizeChange={setListPageSize}
+                pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+              />
             </div>
           ) : null}
           {!hasReminders && notifPerm === 'default' ? (
@@ -549,6 +802,18 @@ export default function Dashboard() {
           </span>
           <span className="stat-hint">Open jobs only — closed hidden</span>
         </div>
+        <div
+          className="stat-tile stat-tile-owes-clients stat-tile-static"
+          title="Studio order dues plus My Exposing gross (every row). Not the same-person visit net tile."
+        >
+          <span className="stat-label">To collect (desk)</span>
+          <span className="stat-value stat-value-money warn">
+            {formatINR(totalCollectStudioPlusExposingGross)}
+          </span>
+          <span className="stat-hint">
+            Studio {formatINR(totalAllClientsStudioDue)} + exposing {formatINR(totalAllVisitsDueGrossAll)} · gross
+          </span>
+        </div>
         <div className="stat-tile stat-tile-5 stat-tile-static">
           <span className="stat-label">Est. profit (all time)</span>
           <span
@@ -598,37 +863,74 @@ export default function Dashboard() {
       </div>
 
       <div className="dash-grid">
-        {clientsWithBalanceDue.length > 0 ? (
+        {clientsWithBalanceDue.length > 0 || totalAllVisitsDueGrossAll > 0 ? (
           <section
             className="card card-lift dash-card card-wide"
-            aria-label="Clients with balance due"
+            aria-label="Balances to collect"
           >
             <div className="dash-card-head">
-              <h3>Clients with balance due</h3>
+              <h3>Balances to collect</h3>
               <p className="dash-card-subtitle">
-                All studio orders where something is still to collect—grouped by client. Open{' '}
-                <strong>Orders</strong> to add a payment.
+                <strong>Studio</strong> = all client orders with something left to collect.{' '}
+                <strong>My Exposing</strong> = gross still due on each outside visit (amount − collected), all dates.
+                Combined is a simple sum — not the &quot;same person&quot; net from the Pending (visits) tile.
               </p>
             </div>
-            <ul className="dash-feed">
-              {clientsWithBalanceDue.map(row => (
-                <li key={row.clientId} className="dash-feed-item dash-feed-item--client">
-                  <div>
-                    <div className="dash-feed-title">{row.name}</div>
-                    <div className="muted small">
-                      {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
-                    </div>
-                  </div>
-                  <div className="dash-feed-money">
-                    <div className="dash-feed-due">{formatINR(row.dueSum)}</div>
-                    <div className="dash-feed-received">to collect</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <div style={{marginTop: '0.5rem'}}>
+            <div className="dash-clients-grand-total dash-clients-grand-total--stack" role="status">
+              <div className="dash-clients-grand-total-row">
+                <span className="dash-clients-grand-total-label">Studio (all clients)</span>
+                <span className="dash-clients-grand-total-subval">{formatINR(totalAllClientsStudioDue)}</span>
+              </div>
+              <div className="dash-clients-grand-total-row">
+                <span className="dash-clients-grand-total-label">My Exposing (gross)</span>
+                <span className="dash-clients-grand-total-subval">{formatINR(totalAllVisitsDueGrossAll)}</span>
+              </div>
+              <div className="dash-clients-grand-total-row dash-clients-grand-total-row--total">
+                <span className="dash-clients-grand-total-label">Total desk</span>
+                <span className="dash-clients-grand-total-value">
+                  {formatINR(totalCollectStudioPlusExposingGross)}
+                </span>
+              </div>
+            </div>
+            {clientsWithBalanceDue.length > 0 ? (
+              <>
+                <ul className="dash-feed">
+                  {balancesPage.slice.map(row => (
+                    <li key={row.clientId} className="dash-feed-item dash-feed-item--client">
+                      <div>
+                        <div className="dash-feed-title">{row.name}</div>
+                        <div className="muted small">
+                          {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
+                        </div>
+                      </div>
+                      <div className="dash-feed-money">
+                        <div className="dash-feed-due">{formatINR(row.dueSum)}</div>
+                        <div className="dash-feed-received">to collect</div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <DashPagination
+                  page={balancesPage.page}
+                  pageCount={balancesPage.pageCount}
+                  total={balancesPage.total}
+                  pageSize={listPageSize}
+                  setPage={balancesPage.setPage}
+                  onPageSizeChange={setListPageSize}
+                  pageSizeOptions={DASH_LIST_PAGE_SIZE_OPTIONS}
+                />
+              </>
+            ) : (
+              <p className="muted small" style={{margin: '0 0 0.75rem'}}>
+                No studio balances by client right now. Use <strong>My Exposing</strong> for outside collections.
+              </p>
+            )}
+            <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.35rem'}}>
               <button type="button" className="btn primary btn-sm shine" onClick={() => setTab('orders')}>
                 Open orders
+              </button>
+              <button type="button" className="btn btn-sm" onClick={() => setTab('field')}>
+                My Exposing
               </button>
             </div>
           </section>

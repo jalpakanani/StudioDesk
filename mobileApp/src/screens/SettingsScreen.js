@@ -13,30 +13,45 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { AndroidNotificationSetting } from '@notifee/react-native';
 import {
   getDeskNotificationState,
   requestDeskNotificationPermission,
 } from '../notifications/notifeeDesk';
+import {
+  getAndroidAlarmSetting,
+  openAndroidAlarmPermissionSettings,
+} from '../notifications/scheduleDeskTriggers';
 import { colors, radius } from '../theme';
 
 export default function SettingsScreen() {
   const { user, logOut } = useAuth();
   const [notifAuthorized, setNotifAuthorized] = useState(false);
   const [notifDenied, setNotifDenied] = useState(false);
+  const [androidAlarmOff, setAndroidAlarmOff] = useState(false);
 
   const refreshNotif = useCallback(async () => {
     const s = await getDeskNotificationState();
     setNotifAuthorized(s.authorized);
     setNotifDenied(s.denied);
+    if (Platform.OS === 'android') {
+      const alarm = await getAndroidAlarmSetting();
+      setAndroidAlarmOff(alarm === AndroidNotificationSetting.DISABLED);
+    } else {
+      setAndroidAlarmOff(false);
+    }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       let alive = true;
-      getDeskNotificationState().then(s => {
-        if (alive) {
-          setNotifAuthorized(s.authorized);
-          setNotifDenied(s.denied);
+      getDeskNotificationState().then(async s => {
+        if (!alive) return;
+        setNotifAuthorized(s.authorized);
+        setNotifDenied(s.denied);
+        if (Platform.OS === 'android') {
+          const alarm = await getAndroidAlarmSetting();
+          if (alive) setAndroidAlarmOff(alarm === AndroidNotificationSetting.DISABLED);
         }
       });
       return () => {
@@ -93,8 +108,10 @@ export default function SettingsScreen() {
             <View style={styles.notifCopy}>
               <Text style={styles.notifTitle}>Desk reminders</Text>
               <Text style={styles.notifSub}>
-                Tomorrow's jobs and overdue balances (up to five per type per day, spaced out—same idea as
-                the web app).
+                While the app is open: instant alerts (up to five per type per day, spaced out). When the app
+                is closed: scheduled summaries — next morning ~7:30 for tomorrow&apos;s jobs / visits, and
+                ~10:00 for payment-due jobs (times are local). Open the app after editing the desk so times
+                stay updated.
               </Text>
             </View>
             <Switch
@@ -122,6 +139,17 @@ export default function SettingsScreen() {
               accessibilityRole="button"
             >
               <Text style={styles.deniedLink}>Notifications blocked — open system settings</Text>
+            </TouchableOpacity>
+          ) : null}
+          {Platform.OS === 'android' && notifAuthorized && androidAlarmOff ? (
+            <TouchableOpacity
+              onPress={() => openAndroidAlarmPermissionSettings()}
+              style={styles.deniedWrap}
+              accessibilityRole="button"
+            >
+              <Text style={styles.deniedLink}>
+                Allow &quot;Alarms &amp; reminders&quot; so closed-app reminders fire on time (Android 12+)
+              </Text>
             </TouchableOpacity>
           ) : null}
         </View>

@@ -16,6 +16,7 @@ import {
   writeReminderSig,
 } from '../utils/remindersStorage';
 import { ensureDeskReminderChannel, getDeskNotificationAuthorized, DESK_REMINDER_CHANNEL_ID } from '../notifications/notifeeDesk';
+import { syncDeskScheduledNotifications } from '../notifications/scheduleDeskTriggers';
 import { isOrderWorkflowClosed } from '../utils/orderWorkflow';
 
 const MIN_GAP_MS = 2.75 * 60 * 60 * 1000;
@@ -42,6 +43,7 @@ export function useReminderNotificationsMobile(orders, fieldVisits, clientById) 
       } catch {
         return;
       }
+      await syncDeskScheduledNotifications(orders, fieldVisits, clientById);
       const allowed = await getDeskNotificationAuthorized();
       if (!allowed || cancelled) return;
 

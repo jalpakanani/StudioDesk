@@ -15,13 +15,15 @@ import { useAuth } from '../context/AuthContext';
 import { colors, radius } from '../theme';
 
 export default function LoginScreen() {
-  const { signIn, signUp, sendPasswordReset, setAuthError, authError } = useAuth();
+  const { signIn, signUp, sendPasswordReset, setAuthError, authError } =
+    useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mode, setMode] = useState('signin');
   const [busy, setBusy] = useState(false);
   const [localErr, setLocalErr] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submit() {
     setLocalErr('');
@@ -40,7 +42,11 @@ export default function LoginScreen() {
       else await signUp(email, password);
     } catch (err) {
       const code = err?.code || '';
-      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+      if (
+        code === 'auth/invalid-credential' ||
+        code === 'auth/wrong-password' ||
+        code === 'auth/user-not-found'
+      ) {
         setLocalErr('Wrong email or password.');
       } else if (code === 'auth/email-already-in-use') {
         setLocalErr('That email is already registered. Sign in instead.');
@@ -78,69 +84,107 @@ export default function LoginScreen() {
   const err = localErr || authError;
 
   return (
-    <SafeAreaView style={styles.safeOuter} edges={['top', 'bottom', 'left', 'right']}>
+    <SafeAreaView
+      style={styles.safeOuter}
+      edges={['top', 'bottom', 'left', 'right']}
+    >
       <KeyboardAvoidingView
         style={styles.wrap}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
       >
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={styles.brand}>My Studio Desk</Text>
-        <Text style={styles.tag}>Orders & payments · My Exposing</Text>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          <Text style={styles.brand}>My Studio Desk</Text>
+          <Text style={styles.tag}>Orders & payments · My Exposing</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
-            placeholder="you@example.com"
-            placeholderTextColor={colors.muted}
-          />
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            placeholder="••••••••"
-            placeholderTextColor={colors.muted}
-          />
+          <View style={styles.card}>
+            <Text style={styles.label}>Email</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoCorrect={false}
+              placeholder="you@example.com"
+              placeholderTextColor={colors.muted}
+            />
+            <Text style={styles.label}>Password</Text>
+            <View style={styles.passwordRow}>
+              <TextInput
+                style={styles.inputPassword}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                placeholder={
+                  mode === 'signin' ? '••••••••' : 'At least 6 characters'
+                }
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setShowPassword(v => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showPassword ? 'Hide password' : 'Show password'
+                }
+              >
+                <Text style={styles.eyeBtnText}>
+                  {showPassword ? 'Hide' : 'Show'}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-          {err ? <Text style={styles.err}>{err}</Text> : null}
-          {resetSent ? <Text style={styles.ok}>Password reset email sent.</Text> : null}
+            {err ? <Text style={styles.err}>{err}</Text> : null}
+            {resetSent ? (
+              <Text style={styles.ok}>Password reset email sent.</Text>
+            ) : null}
 
-          <TouchableOpacity
-            style={[styles.btn, styles.btnPrimary]}
-            onPress={submit}
-            disabled={busy}
-          >
-            {busy ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.btnText}>{mode === 'signin' ? 'Sign in' : 'Create account'}</Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnPrimary]}
+              onPress={submit}
+              disabled={busy}
+            >
+              {busy ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.btnText}>
+                  {mode === 'signin' ? 'Sign in' : 'Create account'}
+                </Text>
+              )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.link}
-            onPress={() => {
-              setMode(mode === 'signin' ? 'signup' : 'signin');
-              setLocalErr('');
-              setAuthError('');
-            }}
-          >
-            <Text style={styles.linkText}>
-              {mode === 'signin' ? 'Need an account? Sign up' : 'Have an account? Sign in'}
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.link}
+              onPress={() => {
+                setMode(mode === 'signin' ? 'signup' : 'signin');
+                setShowPassword(false);
+                setLocalErr('');
+                setAuthError('');
+              }}
+            >
+              <Text style={styles.linkText}>
+                {mode === 'signin'
+                  ? 'Need an account? Sign up'
+                  : 'Have an account? Sign in'}
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.link} onPress={onForgot} disabled={busy}>
-            <Text style={styles.linkText}>Forgot password</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={styles.link}
+              onPress={onForgot}
+              disabled={busy}
+            >
+              <Text style={styles.linkText}>Forgot password</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -150,9 +194,28 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeOuter: { flex: 1, backgroundColor: colors.bg },
   wrap: { flex: 1, backgroundColor: colors.bg },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  brand: { fontSize: 26, fontWeight: '800', color: colors.text, textAlign: 'center', letterSpacing: -0.5 },
-  tag: { fontSize: 14, color: colors.muted, textAlign: 'center', marginTop: 6, marginBottom: 28, lineHeight: 20 },
+  scrollView: { flex: 1 },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+    paddingBottom: 120,
+  },
+  brand: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: colors.text,
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  tag: {
+    fontSize: 14,
+    color: colors.muted,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 28,
+    lineHeight: 20,
+  },
   card: {
     backgroundColor: colors.card,
     borderRadius: radius.lg,
@@ -169,7 +232,12 @@ const styles = StyleSheet.create({
       android: { elevation: 8 },
     }),
   },
-  label: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 6 },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 6,
+  },
   input: {
     backgroundColor: colors.inputBg,
     borderWidth: 1.5,
@@ -180,6 +248,36 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 14,
     fontSize: 16,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 14,
+  },
+  inputPassword: {
+    flex: 1,
+    minWidth: 0,
+    backgroundColor: colors.inputBg,
+    borderWidth: 1.5,
+    borderColor: colors.inputBorder,
+    borderRadius: radius.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: colors.text,
+    fontSize: 16,
+  },
+  eyeBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    minWidth: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eyeBtnText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: '700',
   },
   err: {
     color: '#9a3412',
@@ -204,7 +302,12 @@ const styles = StyleSheet.create({
     borderColor: colors.alertSuccessBorder,
     overflow: 'hidden',
   },
-  btn: { borderRadius: radius.sm, paddingVertical: 14, alignItems: 'center', marginTop: 4 },
+  btn: {
+    borderRadius: radius.sm,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
   btnPrimary: {
     backgroundColor: colors.primary,
     borderWidth: 0,

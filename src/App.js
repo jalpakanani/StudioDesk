@@ -7,6 +7,7 @@ import Dashboard from './components/Dashboard';
 import ClientsView from './components/ClientsView';
 import OrdersView from './components/OrdersView';
 import FieldVisitsView from './components/FieldVisitsView';
+import SettingsView from './components/SettingsView';
 import BackupBar from './components/BackupBar';
 import GlobalSearch from './components/GlobalSearch';
 import LoginScreen from './components/LoginScreen';
@@ -16,6 +17,7 @@ const TABS = [
   { id: 'clients', label: 'Clients', icon: '◎' },
   { id: 'orders', label: 'Orders', icon: '▤' },
   { id: 'field', label: 'My Exposing', icon: '⌖' },
+  { id: 'settings', label: 'Settings', icon: '⚙' },
 ];
 
 function ReminderRunner() {
@@ -107,6 +109,7 @@ function Shell() {
           {tab === 'clients' && <ClientsView />}
           {tab === 'orders' && <OrdersView />}
           {tab === 'field' && <FieldVisitsView />}
+          {tab === 'settings' && <SettingsView />}
         </div>
       </main>
 

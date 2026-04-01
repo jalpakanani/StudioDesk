@@ -17,6 +17,18 @@ import { isOrderWorkflowClosed } from '../utils/orderWorkflow';
 /** ~2h 45m → up to 5 pings fit in a typical waking day without stacking too tight. */
 const MIN_GAP_MS = 2.75 * 60 * 60 * 1000;
 const MAX_NOTIFS_PER_KIND_PER_DAY = 5;
+export const DESK_ALERTS_ENABLED_KEY = 'deskAlertsEnabled';
+
+function readDeskAlertsEnabled() {
+  if (typeof window === 'undefined') return true;
+  try {
+    const raw = window.localStorage.getItem(DESK_ALERTS_ENABLED_KEY);
+    if (raw == null) return true;
+    return raw !== '0';
+  } catch {
+    return true;
+  }
+}
 
 /**
  * Optional desktop notifications when permission is granted.
@@ -27,8 +39,10 @@ const MAX_NOTIFS_PER_KIND_PER_DAY = 5;
 export function useReminderNotifications(orders, fieldVisits, clientById) {
   useEffect(() => {
     if (typeof window === 'undefined' || !('Notification' in window)) return undefined;
+    let alertsEnabled = readDeskAlertsEnabled();
 
     function run() {
+      if (!alertsEnabled) return;
       if (Notification.permission !== 'granted') return;
 
       const today = localCalendarTodayISO();
@@ -123,8 +137,19 @@ export function useReminderNotifications(orders, fieldVisits, clientById) {
       }
     }
 
+    function syncToggleFromStorage() {
+      alertsEnabled = readDeskAlertsEnabled();
+      if (alertsEnabled) run();
+    }
+
     run();
     const id = window.setInterval(run, MIN_GAP_MS);
-    return () => window.clearInterval(id);
+    window.addEventListener('storage', syncToggleFromStorage);
+    window.addEventListener('desk-alerts-changed', syncToggleFromStorage);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener('storage', syncToggleFromStorage);
+      window.removeEventListener('desk-alerts-changed', syncToggleFromStorage);
+    };
   }, [orders, fieldVisits, clientById]);
 }

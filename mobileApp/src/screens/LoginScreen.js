@@ -81,8 +81,6 @@ export default function LoginScreen() {
     }
   }
 
-  const err = localErr || authError;
-
   return (
     <SafeAreaView
       style={styles.safeOuter}

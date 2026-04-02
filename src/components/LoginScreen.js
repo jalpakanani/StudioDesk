@@ -1,5 +1,8 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { setAppLanguage } from '../i18n';
+import { useStudioDisplayName } from '../hooks/useStudioDisplayName';
 
 function IconEye({ className }) {
   return (
@@ -34,6 +37,8 @@ function IconEyeOff({ className }) {
 }
 
 export default function LoginScreen() {
+  const { t, i18n } = useTranslation();
+  const studioName = useStudioDisplayName();
   const { signIn, signUp, sendPasswordReset, setAuthError, authError } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,11 +56,11 @@ export default function LoginScreen() {
     setLocalErr('');
     setAuthError('');
     if (!email.trim() || !password) {
-      setLocalErr('Email and password are required.');
+      setLocalErr(t('login.errRequired'));
       return;
     }
     if (password.length < 6) {
-      setLocalErr('Password must be at least 6 characters.');
+      setLocalErr(t('login.errPasswordShort'));
       return;
     }
     setBusy(true);
@@ -65,15 +70,15 @@ export default function LoginScreen() {
     } catch (err) {
       const code = err?.code || '';
       if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
-        setLocalErr('Wrong email or password.');
+        setLocalErr(t('login.errWrongCredentials'));
       } else if (code === 'auth/email-already-in-use') {
-        setLocalErr('That email is already registered. Sign in instead.');
+        setLocalErr(t('login.errEmailInUse'));
       } else if (code === 'auth/weak-password') {
-        setLocalErr('Password is too weak.');
+        setLocalErr(t('login.errWeakPassword'));
       } else if (code === 'auth/invalid-email') {
-        setLocalErr('Invalid email address.');
+        setLocalErr(t('login.errInvalidEmail'));
       } else {
-        setLocalErr(err?.message || 'Something went wrong.');
+        setLocalErr(err?.message || t('login.errGeneric'));
       }
     } finally {
       setBusy(false);
@@ -87,7 +92,7 @@ export default function LoginScreen() {
     setResetErr('');
     setAuthError('');
     if (!email.trim()) {
-      setResetErr('Enter your email above first.');
+      setResetErr(t('login.errEnterEmailFirst'));
       return;
     }
     setResetBusy(true);
@@ -97,13 +102,13 @@ export default function LoginScreen() {
     } catch (errReset) {
       const code = errReset?.code || '';
       if (code === 'auth/invalid-email') {
-        setResetErr('Invalid email address.');
+        setResetErr(t('login.errInvalidEmail'));
       } else if (code === 'auth/user-not-found') {
-        setResetErr('No account found for that email. Try New account or check spelling.');
+        setResetErr(t('login.errUserNotFound'));
       } else if (code === 'auth/too-many-requests') {
-        setResetErr('Too many attempts. Wait a few minutes and try again.');
+        setResetErr(t('login.errTooManyRequests'));
       } else {
-        setResetErr(errReset?.message || 'Could not send reset email.');
+        setResetErr(errReset?.message || t('login.errResetFailed'));
       }
     } finally {
       setResetBusy(false);
@@ -119,17 +124,33 @@ export default function LoginScreen() {
   return (
     <div className="login-screen">
       <div className="login-card" role="main">
+        <div className="login-lang-row" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', marginBottom: '1rem' }}>
+          <button
+            type="button"
+            className={`btn btn-sm ${i18n.language === 'en' ? 'primary' : ''}`}
+            onClick={() => setAppLanguage('en')}
+          >
+            {t('language.english')}
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${i18n.language === 'gu' ? 'primary' : ''}`}
+            onClick={() => setAppLanguage('gu')}
+          >
+            {t('language.gujarati')}
+          </button>
+        </div>
         <header className="login-header">
           <span className="login-logo" aria-hidden="true">
             S
           </span>
           <div className="login-header-text">
-            <h1 className="login-title">My Studio Desk</h1>
-            <p className="login-subtitle">Sign in once—your desk follows you on every device.</p>
+            <h1 className="login-title">{studioName || t('login.title')}</h1>
+            <p className="login-subtitle">{t('login.subtitle')}</p>
           </div>
         </header>
 
-        <div className="login-seg" role="tablist" aria-label="Account">
+        <div className="login-seg" role="tablist" aria-label={t('login.accountTabs')}>
           <button
             type="button"
             role="tab"
@@ -143,7 +164,7 @@ export default function LoginScreen() {
               closeForgot();
             }}
           >
-            Sign in
+            {t('login.signIn')}
           </button>
           <button
             type="button"
@@ -158,33 +179,33 @@ export default function LoginScreen() {
               closeForgot();
             }}
           >
-            New account
+            {t('login.newAccount')}
           </button>
         </div>
 
         <form className="login-form" onSubmit={submit} noValidate>
           <div className="login-field">
-            <label htmlFor="login-email">Email</label>
+            <label htmlFor="login-email">{t('login.email')}</label>
             <input
               id="login-email"
               className="login-input"
               type="email"
               autoComplete="email"
-              placeholder="you@example.com"
+              placeholder={t('login.placeholderEmail')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
             />
           </div>
           <div className="login-field">
-            <label htmlFor="login-password">Password</label>
+            <label htmlFor="login-password">{t('login.password')}</label>
             <div className="login-password-row">
               <input
                 id="login-password"
                 className="login-input login-input--password"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                placeholder={mode === 'signin' ? '••••••••' : 'At least 6 characters'}
+                placeholder={mode === 'signin' ? t('login.placeholderPasswordSignin') : t('login.placeholderPasswordSignup')}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -194,9 +215,9 @@ export default function LoginScreen() {
                 type="button"
                 className="login-password-toggle"
                 onClick={() => setShowPassword((v) => !v)}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? t('login.hidePassword') : t('login.showPassword')}
                 aria-pressed={showPassword}
-                title={showPassword ? 'Hide password' : 'Show password'}
+                title={showPassword ? t('login.hidePassword') : t('login.showPassword')}
               >
                 {showPassword ? <IconEyeOff /> : <IconEye />}
               </button>
@@ -214,7 +235,7 @@ export default function LoginScreen() {
                   }}
                   aria-expanded={forgotOpen}
                 >
-                  {forgotOpen ? 'Hide' : 'Forgot password?'}
+                  {forgotOpen ? t('login.forgotToggleHide') : t('login.forgotToggle')}
                 </button>
               </div>
             ) : null}
@@ -224,14 +245,11 @@ export default function LoginScreen() {
             <div className="login-forgot-panel">
               {resetSent ? (
                 <div className="login-alert login-alert--success" role="status">
-                  <strong>Check your email.</strong> If <strong>{email.trim()}</strong> is registered, Firebase sent a link
-                  to set a new password. Look in <strong>Spam</strong> too. Then return here and sign in.
+                  {t('login.resetSuccess', { email: email.trim() })}
                 </div>
               ) : (
                 <>
-                  <p className="login-forgot-hint muted small">
-                    Enter the email you use for this desk, then send a reset link.
-                  </p>
+                  <p className="login-forgot-hint muted small">{t('login.resetHint')}</p>
                   {resetErr ? (
                     <div className="login-alert" role="alert">
                       {resetErr}
@@ -243,12 +261,12 @@ export default function LoginScreen() {
                     disabled={resetBusy}
                     onClick={handlePasswordReset}
                   >
-                    {resetBusy ? 'Sending…' : 'Email me a reset link'}
+                    {resetBusy ? t('login.resetSending') : t('login.resetSend')}
                   </button>
                 </>
               )}
               <button type="button" className="login-forgot-back muted small" onClick={closeForgot}>
-                {resetSent ? 'Back to sign in' : 'Cancel'}
+                {resetSent ? t('login.resetBack') : t('login.resetCancel')}
               </button>
             </div>
           ) : null}
@@ -260,7 +278,7 @@ export default function LoginScreen() {
           ) : null}
 
           <button type="submit" className="login-submit btn primary shine" disabled={busy}>
-            {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+            {busy ? t('login.submitWait') : mode === 'signin' ? t('login.signIn') : t('login.createAccount')}
           </button>
         </form>
       </div>

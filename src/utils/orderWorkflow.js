@@ -1,6 +1,7 @@
 import { coerceDateFieldToISO, orderEventRange } from './dateRange';
 import { sumPayments } from './money';
 import { localCalendarTodayISO } from './reminders';
+import i18n from '../i18n';
 
 /**
  * Auto-derived from calendar + payments (no manual field).
@@ -31,7 +32,8 @@ export function deriveOrderWorkflowStatus(order, todayISO) {
   return 'closed';
 }
 
-const LABELS = {
+/** English-only corpus for desk search token matching (not shown in UI). */
+const LABELS_EN = {
   booked: 'Booked',
   in_progress: 'In progress',
   pending_payment: 'Payment pending',
@@ -40,9 +42,8 @@ const LABELS = {
 
 export function orderWorkflowLabel(status) {
   const s = String(status || '').trim();
-  if (LABELS[s]) return LABELS[s];
-  if (s === 'delivered') return 'Closed';
-  return LABELS.booked;
+  const key = s === 'delivered' ? 'closed' : LABELS_EN[s] ? s : 'booked';
+  return i18n.t(`workflow.${key}`);
 }
 
 /** Hide from “active” dashboard lists when job is done and settled. */
@@ -52,7 +53,7 @@ export function isOrderWorkflowClosed(order, todayISO) {
 
 export function orderWorkflowSearchText(status) {
   const s = String(status || '').trim();
-  const base = orderWorkflowLabel(s);
+  const base = s === 'delivered' ? LABELS_EN.closed : LABELS_EN[s] || LABELS_EN.booked;
   const extra = {
     booked: 'future upcoming scheduled',
     in_progress: 'today shoot shooting ongoing active',

@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { setAppLanguage } from '../i18n';
 import { DESK_ALERTS_ENABLED_KEY } from '../hooks/useReminderNotifications';
+import { readStudioDisplayName, writeStudioDisplayName } from '../utils/studioDisplayName';
 
 function readEnabled() {
   if (typeof window === 'undefined') return true;
@@ -23,13 +26,16 @@ function notifyDeskAlertsChanged() {
 }
 
 export default function SettingsView() {
+  const { t, i18n } = useTranslation();
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const [permission, setPermission] = useState('default');
+  const [studioNameDraft, setStudioNameDraft] = useState('');
   const unsupported = permission === 'unsupported';
 
   useEffect(() => {
     setAlertsEnabled(readEnabled());
     setPermission(browserNotifState());
+    setStudioNameDraft(readStudioDisplayName());
   }, []);
 
   async function onToggle(next) {
@@ -68,8 +74,9 @@ export default function SettingsView() {
   function sendTestNotification() {
     if (unsupported || Notification.permission !== 'granted' || !alertsEnabled) return;
     try {
-      new Notification('My Studio Desk — test', {
-        body: 'If you see this, browser alerts are working. Real alerts only when you have tomorrow jobs / visits or payment-due orders.',
+      const brand = readStudioDisplayName() || t('app.brand');
+      new Notification(`${brand} — ${t('settings.testNotificationSuffix')}`, {
+        body: t('settings.testBody'),
         tag: 'desk-test',
       });
     } catch {
@@ -77,23 +84,67 @@ export default function SettingsView() {
     }
   }
 
+  function saveStudioName() {
+    writeStudioDisplayName(studioNameDraft);
+  }
+
   return (
     <>
       <section className="card card-lift dash-card card-wide">
         <div className="dash-card-head">
-          <h3>Settings</h3>
-          <p className="dash-card-subtitle">
-            Desk alerts run in this tab when the browser allows notifications. They fire for tomorrow&apos;s jobs or
-            visits and for past-event payment due—not on a fixed schedule every minute.
-          </p>
+          <h3>{t('settings.title')}</h3>
+          <p className="dash-card-subtitle">{t('settings.intro')}</p>
+        </div>
+
+        <div className="dash-feed-item dash-feed-item--client" style={{ flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div style={{ flex: '1 1 200px' }}>
+            <div className="dash-feed-title">{t('settings.studioNameTitle')}</div>
+            <div className="muted small">{t('settings.studioNameHint')}</div>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', flex: '1 1 280px' }}>
+            <input
+              type="text"
+              className="login-input"
+              style={{ flex: '1 1 200px', minWidth: 0, maxWidth: '100%' }}
+              value={studioNameDraft}
+              onChange={(e) => setStudioNameDraft(e.target.value)}
+              placeholder={t('settings.studioNamePlaceholder')}
+              maxLength={120}
+              autoComplete="organization"
+            />
+            <button type="button" className="btn primary btn-sm shine" onClick={saveStudioName}>
+              {t('settings.studioNameSave')}
+            </button>
+          </div>
         </div>
 
         <div className="dash-feed-item dash-feed-item--client">
           <div>
-            <div className="dash-feed-title">Desk alerts</div>
-            <div className="muted small">
-              Store preference on this device. You still need browser permission below.
-            </div>
+            <div className="dash-feed-title">{t('language.label')}</div>
+            <div className="muted small">{t('language.hint')}</div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className={`btn btn-sm ${i18n.language === 'en' ? 'primary' : ''}`}
+              onClick={() => setAppLanguage('en')}
+            >
+              {t('language.english')}
+            </button>
+            <button
+              type="button"
+              className={`btn btn-sm ${i18n.language === 'gu' ? 'primary' : ''}`}
+              onClick={() => setAppLanguage('gu')}
+            >
+              {t('language.gujarati')}
+            </button>
+          </div>
+        </div>
+
+        <div className="dash-feed-item dash-feed-item--client">
+          <div>
+            <div className="dash-feed-title">{t('settings.deskAlerts')}</div>
+            <div className="muted small">{t('settings.deskAlertsHint')}</div>
           </div>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
             <input
@@ -101,30 +152,29 @@ export default function SettingsView() {
               checked={alertsEnabled}
               onChange={(e) => onToggle(e.target.checked)}
             />
-            <span className="small">{alertsEnabled ? 'On' : 'Off'}</span>
+            <span className="small">{alertsEnabled ? t('settings.on') : t('settings.off')}</span>
           </label>
         </div>
 
         <p className="muted small" style={{ marginTop: '0.75rem' }}>
-          Browser permission: {unsupported ? 'Not supported' : permission}
+          {t('settings.browserPermission')} {unsupported ? t('settings.notSupported') : permission}
         </p>
         {permission === 'denied' ? (
           <p className="muted small" style={{ marginTop: '0.5rem' }}>
-            Notifications blocked by browser. Allow this site from browser settings (lock icon or site settings), then
-            reload.
+            {t('settings.deniedHint')}
           </p>
         ) : null}
         {!unsupported && permission === 'default' && alertsEnabled ? (
           <div style={{ marginTop: '0.75rem' }}>
             <button type="button" className="btn primary btn-sm shine" onClick={() => requestBrowserPermission()}>
-              Allow browser notifications
+              {t('settings.allowNotif')}
             </button>
           </div>
         ) : null}
         {!unsupported && permission === 'granted' && alertsEnabled ? (
           <div style={{ marginTop: '0.75rem' }}>
             <button type="button" className="btn btn-sm" onClick={() => sendTestNotification()}>
-              Send test notification
+              {t('settings.sendTest')}
             </button>
           </div>
         ) : null}

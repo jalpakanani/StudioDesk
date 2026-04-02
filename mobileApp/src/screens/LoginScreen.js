@@ -11,10 +11,13 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
+import { setAppLanguage } from '../i18n';
 import { colors, radius } from '../theme';
 
 export default function LoginScreen() {
+  const { t, i18n } = useTranslation();
   const { signIn, signUp, sendPasswordReset, setAuthError, authError } =
     useAuth();
   const [email, setEmail] = useState('');
@@ -29,33 +32,33 @@ export default function LoginScreen() {
     setLocalErr('');
     setAuthError('');
     if (!email.trim() || !password) {
-      setLocalErr('Email and password are required.');
+      setLocalErr(t('errRequired'));
       return;
     }
     if (password.length < 6) {
-      setLocalErr('Password must be at least 6 characters.');
+      setLocalErr(t('errPasswordShort'));
       return;
     }
     setBusy(true);
     try {
       if (mode === 'signin') await signIn(email, password);
       else await signUp(email, password);
-    } catch (err) {
-      const code = err?.code || '';
+    } catch (e) {
+      const code = e?.code || '';
       if (
         code === 'auth/invalid-credential' ||
         code === 'auth/wrong-password' ||
         code === 'auth/user-not-found'
       ) {
-        setLocalErr('Wrong email or password.');
+        setLocalErr(t('errWrongCredentials'));
       } else if (code === 'auth/email-already-in-use') {
-        setLocalErr('That email is already registered. Sign in instead.');
+        setLocalErr(t('errEmailInUse'));
       } else if (code === 'auth/weak-password') {
-        setLocalErr('Password is too weak.');
+        setLocalErr(t('errWeakPassword'));
       } else if (code === 'auth/invalid-email') {
-        setLocalErr('Invalid email address.');
+        setLocalErr(t('errInvalidEmail'));
       } else {
-        setLocalErr(err?.message || 'Something went wrong.');
+        setLocalErr(e?.message || t('errGeneric'));
       }
     } finally {
       setBusy(false);
@@ -67,19 +70,21 @@ export default function LoginScreen() {
     setAuthError('');
     setResetSent(false);
     if (!email.trim()) {
-      setLocalErr('Enter your email first.');
+      setLocalErr(t('errEnterEmailFirst'));
       return;
     }
     setBusy(true);
     try {
       await sendPasswordReset(email);
       setResetSent(true);
-    } catch (err) {
-      setLocalErr(err?.message || 'Could not send reset email.');
+    } catch (e) {
+      setLocalErr(e?.message || t('errResetFailed'));
     } finally {
       setBusy(false);
     }
   }
+
+  const err = localErr || authError;
 
   return (
     <SafeAreaView
@@ -97,11 +102,50 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
         >
-          <Text style={styles.brand}>My Studio Desk</Text>
-          <Text style={styles.tag}>Orders & payments · My Exposing</Text>
+          <View style={styles.langRow}>
+            <TouchableOpacity
+              style={[
+                styles.langChip,
+                i18n.language === 'en' && styles.langChipActive,
+              ]}
+              onPress={() => setAppLanguage('en')}
+              accessibilityRole="button"
+              accessibilityLabel={t('languageEnglish')}
+            >
+              <Text
+                style={[
+                  styles.langChipText,
+                  i18n.language === 'en' && styles.langChipTextActive,
+                ]}
+              >
+                {t('languageEnglish')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.langChip,
+                i18n.language === 'gu' && styles.langChipActive,
+              ]}
+              onPress={() => setAppLanguage('gu')}
+              accessibilityRole="button"
+              accessibilityLabel={t('languageGujarati')}
+            >
+              <Text
+                style={[
+                  styles.langChipText,
+                  i18n.language === 'gu' && styles.langChipTextActive,
+                ]}
+              >
+                {t('languageGujarati')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.brand}>{t('brand')}</Text>
+          <Text style={styles.tag}>{t('tag')}</Text>
 
           <View style={styles.card}>
-            <Text style={styles.label}>Email</Text>
+            <Text style={styles.label}>{t('email')}</Text>
             <TextInput
               style={styles.input}
               value={email}
@@ -109,10 +153,10 @@ export default function LoginScreen() {
               autoCapitalize="none"
               keyboardType="email-address"
               autoCorrect={false}
-              placeholder="you@example.com"
+              placeholder={t('placeholderEmail')}
               placeholderTextColor={colors.muted}
             />
-            <Text style={styles.label}>Password</Text>
+            <Text style={styles.label}>{t('password')}</Text>
             <View style={styles.passwordRow}>
               <TextInput
                 style={styles.inputPassword}
@@ -120,7 +164,9 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 placeholder={
-                  mode === 'signin' ? '••••••••' : 'At least 6 characters'
+                  mode === 'signin'
+                    ? t('placeholderPasswordSignin')
+                    : t('placeholderPasswordSignup')
                 }
                 placeholderTextColor={colors.muted}
                 autoCapitalize="none"
@@ -131,18 +177,18 @@ export default function LoginScreen() {
                 onPress={() => setShowPassword(v => !v)}
                 accessibilityRole="button"
                 accessibilityLabel={
-                  showPassword ? 'Hide password' : 'Show password'
+                  showPassword ? t('a11yHidePassword') : t('a11yShowPassword')
                 }
               >
                 <Text style={styles.eyeBtnText}>
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? t('hidePassword') : t('showPassword')}
                 </Text>
               </TouchableOpacity>
             </View>
 
             {err ? <Text style={styles.err}>{err}</Text> : null}
             {resetSent ? (
-              <Text style={styles.ok}>Password reset email sent.</Text>
+              <Text style={styles.ok}>{t('resetSent')}</Text>
             ) : null}
 
             <TouchableOpacity
@@ -154,7 +200,7 @@ export default function LoginScreen() {
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.btnText}>
-                  {mode === 'signin' ? 'Sign in' : 'Create account'}
+                  {mode === 'signin' ? t('signIn') : t('createAccount')}
                 </Text>
               )}
             </TouchableOpacity>
@@ -169,9 +215,7 @@ export default function LoginScreen() {
               }}
             >
               <Text style={styles.linkText}>
-                {mode === 'signin'
-                  ? 'Need an account? Sign up'
-                  : 'Have an account? Sign in'}
+                {mode === 'signin' ? t('needAccount') : t('haveAccount')}
               </Text>
             </TouchableOpacity>
 
@@ -180,7 +224,7 @@ export default function LoginScreen() {
               onPress={onForgot}
               disabled={busy}
             >
-              <Text style={styles.linkText}>Forgot password</Text>
+              <Text style={styles.linkText}>{t('forgotPassword')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -198,6 +242,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     paddingBottom: 120,
+  },
+  langRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 20,
+  },
+  langChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: radius.sm,
+    borderWidth: 1.5,
+    borderColor: colors.inputBorder,
+    backgroundColor: colors.inputBg,
+  },
+  langChipActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+  },
+  langChipText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.muted,
+  },
+  langChipTextActive: {
+    color: colors.primary,
   },
   brand: {
     fontSize: 26,

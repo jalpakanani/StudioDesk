@@ -1,18 +1,11 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
-import {
-  Alert,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import DatePickerField from '../components/DatePickerField';
 import { useStudio } from '../context/StudioContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { coerceDateFieldToISO, formatISODateDisplay, orderEventRange, toISODateOr } from '../utils/dateRange';
 import { formatINR, sumPayments } from '../utils/money';
 import { colors, radius } from '../theme';
@@ -20,6 +13,8 @@ import { deriveOrderWorkflowStatus, orderWorkflowLabel } from '../utils/orderWor
 import { localCalendarTodayISO } from '../utils/reminders';
 
 export default function OrderDetailScreen() {
+  const { t } = useTranslation();
+  const { confirmAsync } = useConfirm();
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
@@ -71,17 +66,18 @@ export default function OrderDetailScreen() {
         <TouchableOpacity
           style={styles.deleteOutline}
           onPress={() => {
-            Alert.alert('Delete order', 'Delete this order permanently?', [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Delete',
-                style: 'destructive',
-                onPress: () => {
-                  removeOrder(order.id);
-                  navigation.goBack();
-                },
-              },
-            ]);
+            void (async () => {
+              const ok = await confirmAsync({
+                title: t('deleteOrderTitle'),
+                message: t('deleteOrderMessage'),
+                confirmLabel: t('dialogDelete'),
+                cancelLabel: t('dialogCancel'),
+              });
+              if (ok) {
+                removeOrder(order.id);
+                navigation.goBack();
+              }
+            })();
           }}
         >
           <Text style={styles.deleteOutlineText}>Delete order</Text>
@@ -276,6 +272,8 @@ function ExposureGuestsBlock({
   updateExposureGuest,
   removeExposureGuest,
 }) {
+  const { t } = useTranslation();
+  const { confirmAsync } = useConfirm();
   const list = guests || [];
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -409,14 +407,15 @@ function ExposureGuestsBlock({
               <TouchableOpacity
                 style={[styles.miniBtn, styles.miniBtnDanger]}
                 onPress={() => {
-                  Alert.alert('Remove guest', `Remove ${g.name} from this list?`, [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Remove',
-                      style: 'destructive',
-                      onPress: () => removeExposureGuest(orderId, g.id),
-                    },
-                  ]);
+                  void (async () => {
+                    const ok = await confirmAsync({
+                      title: t('removeGuestTitle'),
+                      message: t('removeGuestMessage', { name: g.name }),
+                      confirmLabel: t('dialogRemove'),
+                      cancelLabel: t('dialogCancel'),
+                    });
+                    if (ok) removeExposureGuest(orderId, g.id);
+                  })();
                 }}
               >
                 <Text style={styles.miniBtnDangerText}>Remove</Text>
@@ -430,6 +429,8 @@ function ExposureGuestsBlock({
 }
 
 function ClientPaymentsBlock({ order, addClientPayment, removeClientPayment }) {
+  const { t } = useTranslation();
+  const { confirmAsync } = useConfirm();
   const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState(() => formatISODateDisplay(localCalendarTodayISO()));
   const [payNote, setPayNote] = useState('');
@@ -483,7 +484,22 @@ function ClientPaymentsBlock({ order, addClientPayment, removeClientPayment }) {
             </Text>
             {p.note ? <Text style={styles.guestMeta}>{p.note}</Text> : null}
           </View>
-          <TouchableOpacity onPress={() => removeClientPayment(order.id, p.id)}>
+          <TouchableOpacity
+            onPress={() => {
+              void (async () => {
+                const ok = await confirmAsync({
+                  title: t('removePaymentTitle'),
+                  message: t('removePaymentMessage', {
+                    amount: formatINR(p.amount),
+                    date: formatISODateDisplay(p.date),
+                  }),
+                  confirmLabel: t('dialogRemove'),
+                  cancelLabel: t('dialogCancel'),
+                });
+                if (ok) removeClientPayment(order.id, p.id);
+              })();
+            }}
+          >
             <Text style={styles.removePay}>×</Text>
           </TouchableOpacity>
         </View>

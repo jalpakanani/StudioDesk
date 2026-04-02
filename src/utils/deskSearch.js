@@ -21,9 +21,21 @@ function matchesTokens(text, tokens) {
 /**
  * @param {string} rawQuery
  * @param {{ clients: any[], orders: any[], fieldVisits: any[], clientById: Map<string, any> }} data
+ * @param {{ client?: string, order?: string, visitVenue?: string, visitTitle?: string, emDash?: string }} [labels] UI labels
  * @returns {{ kind: 'client'|'order'|'visit', id: string, title: string, subtitle: string, tab: string }[]}
  */
-export function buildDeskSearchResults(rawQuery, { clients, orders, fieldVisits, clientById }) {
+export function buildDeskSearchResults(
+  rawQuery,
+  { clients, orders, fieldVisits, clientById },
+  labels = {},
+) {
+  const L = {
+    client: labels.client || 'Client',
+    order: labels.order || 'Order',
+    visitVenue: labels.visitVenue || 'My Exposing',
+    visitTitle: labels.visitTitle || 'Visit',
+    emDash: labels.emDash || '—',
+  };
   const q = norm(rawQuery);
   if (!q) return [];
   const tokens = q.split(/\s+/).filter(Boolean);
@@ -38,8 +50,8 @@ export function buildDeskSearchResults(rawQuery, { clients, orders, fieldVisits,
     out.push({
       kind: 'client',
       id: c.id,
-      title: c.name || 'Client',
-      subtitle: c.phone ? `${c.phone} · Client` : 'Client',
+      title: c.name || L.client,
+      subtitle: c.phone ? `${c.phone} · ${L.client}` : L.client,
       tab: 'clients',
     });
     if (out.length >= cap) return out;
@@ -61,8 +73,8 @@ export function buildDeskSearchResults(rawQuery, { clients, orders, fieldVisits,
     out.push({
       kind: 'order',
       id: o.id,
-      title: o.title || 'Order',
-      subtitle: when ? `${client?.name || '—'} · ${when}` : client?.name || 'Order',
+      title: o.title || L.order,
+      subtitle: when ? `${client?.name || L.emDash} · ${when}` : client?.name || L.order,
       tab: 'orders',
     });
     if (out.length >= cap) return out;
@@ -76,8 +88,8 @@ export function buildDeskSearchResults(rawQuery, { clients, orders, fieldVisits,
     out.push({
       kind: 'visit',
       id: v.id,
-      title: v.hostName || 'Visit',
-      subtitle: when ? `${v.venue || 'My Exposing'} · ${when}` : v.venue || 'My Exposing',
+      title: v.hostName || L.visitTitle,
+      subtitle: when ? `${v.venue || L.visitVenue} · ${when}` : v.venue || L.visitVenue,
       tab: 'field',
     });
     if (out.length >= cap) return out;

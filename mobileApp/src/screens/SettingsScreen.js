@@ -1,16 +1,7 @@
 import { useCallback, useState } from 'react';
-import {
-  Alert,
-  Linking,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { Linking, Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { AndroidNotificationSetting } from '@notifee/react-native';
@@ -23,8 +14,11 @@ import {
   openAndroidAlarmPermissionSettings,
 } from '../notifications/scheduleDeskTriggers';
 import { colors, radius } from '../theme';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function SettingsScreen() {
+  const { t } = useTranslation();
+  const { confirmAsync } = useConfirm();
   const { user, logOut } = useAuth();
   const [notifAuthorized, setNotifAuthorized] = useState(false);
   const [notifDenied, setNotifDenied] = useState(false);
@@ -66,14 +60,14 @@ export default function SettingsScreen() {
       await refreshNotif();
       return;
     }
-    Alert.alert(
-      'Turn off alerts',
-      'To disable desk reminders, turn off notifications for this app in your phone settings.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open settings', onPress: () => Linking.openSettings() },
-      ],
-    );
+    const ok = await confirmAsync({
+      title: t('settingsNotifOffTitle'),
+      message: t('settingsNotifOffMessage'),
+      confirmLabel: t('settingsOpenSettings'),
+      cancelLabel: t('dialogCancel'),
+      danger: false,
+    });
+    if (ok) Linking.openSettings();
   }
 
   return (

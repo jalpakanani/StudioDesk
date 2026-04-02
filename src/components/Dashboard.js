@@ -1,4 +1,5 @@
 import {useEffect, useId, useMemo, useState} from 'react'
+import {useTranslation} from 'react-i18next'
 import {useStudio} from '../context/StudioContext'
 import {useTab} from '../context/TabContext'
 import {formatINR, sumPayments} from '../utils/money'
@@ -82,6 +83,7 @@ function DashPagination({
   onPageSizeChange,
   pageSizeOptions,
 }) {
+  const {t} = useTranslation()
   const selectId = useId()
   const [jumpDraft, setJumpDraft] = useState(() => String(page))
 
@@ -93,7 +95,7 @@ function DashPagination({
 
   const start = (page - 1) * pageSize + 1
   const end = Math.min(page * pageSize, total)
-  const rowWord = total === 1 ? 'row' : 'rows'
+  const rowWord = total === 1 ? t('dash.row') : t('dash.rows')
 
   function commitJump() {
     const n = parseInt(jumpDraft, 10)
@@ -107,10 +109,17 @@ function DashPagination({
   }
 
   return (
-    <div className="dash-pagination-bar" role="navigation" aria-label="Table pagination">
+    <div
+      className="dash-pagination-bar"
+      role="navigation"
+      aria-label={t('dash.pagination')}
+    >
       <div className="dash-pagination-bar__left">
-        <label htmlFor={selectId} className="dash-pagination-bar__rpp-label muted small">
-          Rows per page
+        <label
+          htmlFor={selectId}
+          className="dash-pagination-bar__rpp-label muted small"
+        >
+          {t('dash.rowsPerPage')}
         </label>
         <select
           id={selectId}
@@ -126,7 +135,7 @@ function DashPagination({
         </select>
       </div>
       <div className="dash-pagination-bar__range muted small">
-        {start}-{end} of {total} {rowWord}
+        {t('dash.range', {start, end, total, rowWord})}
       </div>
       <div className="dash-pagination-bar__right">
         {/* <button
@@ -152,7 +161,7 @@ function DashPagination({
           <span className="dash-pagination-bar__chev" aria-hidden="true">
             ‹
           </span>{' '}
-          Previous
+          {t('dash.previous')}
         </button>
         <input
           className="dash-pagination-bar__jump"
@@ -168,16 +177,18 @@ function DashPagination({
               commitJump()
             }
           }}
-          aria-label="Go to page"
+          aria-label={t('dash.goToPage')}
         />
-        <span className="dash-pagination-bar__of muted small">of {pageCount}</span>
+        <span className="dash-pagination-bar__of muted small">
+          {t('dash.ofPages', {count: pageCount})}
+        </span>
         <button
           type="button"
           className="dash-pagination-bar__nav"
           disabled={page >= pageCount}
           onClick={() => setPage(p => Math.min(pageCount, p + 1))}
         >
-          Next{' '}
+          {t('dash.next')}{' '}
           <span className="dash-pagination-bar__chev" aria-hidden="true">
             ›
           </span>
@@ -228,15 +239,16 @@ function futureOrderSortKey(order) {
 }
 
 /** Label for dashboard row: wedding/event span, else order (booked) date. */
-function upcomingOrderWhenLabel(order) {
+function upcomingOrderWhenLabel(order, tt) {
   const {from, to} = orderEventRange(order)
   if (from) return formatDateRangeEn(from, to)
   const od = coerceDateFieldToISO(order.orderDate)
-  if (od) return `Booked ${formatDateRangeEn(od, od)}`
+  if (od) return tt('dash.bookedWhen', {date: formatDateRangeEn(od, od)})
   return ''
 }
 
 export default function Dashboard() {
+  const {t} = useTranslation()
   const {orders, clients, clientById, fieldVisits} = useStudio()
   const {setTab, setNavFocus} = useTab()
   const [listPageSize, setListPageSize] = useState(readStoredListPageSize)
@@ -257,7 +269,11 @@ export default function Dashboard() {
         const due = total - received
         return {order: o, received, due, total}
       })
-      .filter(x => isOrderFuture(x.order, todayDesk) && !isOrderWorkflowClosed(x.order, todayDesk))
+      .filter(
+        x =>
+          isOrderFuture(x.order, todayDesk) &&
+          !isOrderWorkflowClosed(x.order, todayDesk),
+      )
       .sort((a, b) => {
         const c = futureOrderSortKey(a.order).localeCompare(
           futureOrderSortKey(b.order),
@@ -289,13 +305,15 @@ export default function Dashboard() {
     return Array.from(map.entries())
       .map(([clientId, agg]) => ({
         clientId,
-        name: String(clientById.get(clientId)?.name || '').trim() || '—',
+        name:
+          String(clientById.get(clientId)?.name || '').trim() ||
+          t('common.dash'),
         dueSum: agg.dueSum,
         orderCount: agg.orderCount,
       }))
       .filter(x => x.dueSum > 0)
       .sort((a, b) => b.dueSum - a.dueSum)
-  }, [orders, clientById])
+  }, [orders, clientById, t])
 
   /** Sum of all studio order balances by client (not “same person” visit netting). */
   const totalAllClientsStudioDue = useMemo(
@@ -325,28 +343,28 @@ export default function Dashboard() {
 
   /** Gross still due on upcoming visits (before netting studio pay to same person). */
   const totalVisitDueGross = useMemo(() => {
-    const t = todayISO()
+    const deskDay = todayISO()
     return visitBalances.reduce((s, x) => {
-      if (x.due <= 0 || !isVisitFuture(x.v, t)) return s
+      if (x.due <= 0 || !isVisitFuture(x.v, deskDay)) return s
       return s + Math.max(0, x.due)
     }, 0)
   }, [visitBalances])
 
   /** Same as settlement table: upcoming visit due minus matched “Pay them” on exposure guests. */
   const totalVisitDueNet = useMemo(() => {
-    const t = todayISO()
+    const deskDay = todayISO()
     return netVisitPendingAfterStudioPay(
       orders,
       fieldVisits,
-      (v, due) => due > 0 && isVisitFuture(v, t),
+      (v, due) => due > 0 && isVisitFuture(v, deskDay),
     )
   }, [orders, fieldVisits])
 
   /** Upcoming / today-or-later visits only, with pending amount to collect */
   const dashboardVisitRows = useMemo(() => {
-    const t = todayISO()
+    const deskDay = todayISO()
     const rows = visitBalances.filter(
-      ({v, due}) => due > 0 && isVisitFuture(v, t),
+      ({v, due}) => due > 0 && isVisitFuture(v, deskDay),
     )
     rows.sort((a, b) => {
       const af = fieldVisitRange(a.v).from
@@ -381,29 +399,30 @@ export default function Dashboard() {
   )
 
   const thisWeekOrderRows = useMemo(() => {
-    const t = todayISO()
-    const {weekStart, weekEnd} = calendarWeekRangeISO(t)
+    const deskDay = todayISO()
+    const {weekStart, weekEnd} = calendarWeekRangeISO(deskDay)
     return orders
       .filter(o => {
-        if (isOrderWorkflowClosed(o, t)) return false
+        if (isOrderWorkflowClosed(o, deskDay)) return false
         const r = orderEventRange(o)
-        if (r.from) return rangeOverlapsWindow(r.from, r.to || r.from, weekStart, weekEnd)
+        if (r.from)
+          return rangeOverlapsWindow(r.from, r.to || r.from, weekStart, weekEnd)
         const od = coerceDateFieldToISO(o.orderDate)
         return od ? rangeOverlapsWindow(od, od, weekStart, weekEnd) : false
       })
       .map(o => ({
         order: o,
-        client: clientById.get(o.clientId)?.name || '—',
-        when: upcomingOrderWhenLabel(o),
+        client: clientById.get(o.clientId)?.name || t('common.dash'),
+        when: upcomingOrderWhenLabel(o, t),
       }))
       .sort((a, b) =>
         futureOrderSortKey(a.order).localeCompare(futureOrderSortKey(b.order)),
       )
-  }, [orders, clientById])
+  }, [orders, clientById, t])
 
   const thisWeekVisitRows = useMemo(() => {
-    const t = todayISO()
-    const {weekStart, weekEnd} = calendarWeekRangeISO(t)
+    const deskDay = todayISO()
+    const {weekStart, weekEnd} = calendarWeekRangeISO(deskDay)
     return (fieldVisits || [])
       .filter(v => {
         const {from, to} = fieldVisitRange(v)
@@ -424,21 +443,24 @@ export default function Dashboard() {
   const balancesPage = usePagedSlice(clientsWithBalanceDue, listPageSize)
 
   const tWeek = todayISO()
-  const {weekStart: weekStartISO, weekEnd: weekEndISO} = calendarWeekRangeISO(tWeek)
+  const {weekStart: weekStartISO, weekEnd: weekEndISO} =
+    calendarWeekRangeISO(tWeek)
   const thisWeekRangeText = formatDateRangeEn(weekStartISO, weekEndISO)
 
   return (
     <div className="panel">
       <div className="panel-head">
         <div>
-          <h2 className="panel-title">Dashboard</h2>
-          <p className="panel-lead">
-            Dues, outside visits, and quick adds—at a glance.
-          </p>
+          <h2 className="panel-title">{t('dash.title')}</h2>
+          <p className="panel-lead">{t('dash.lead')}</p>
         </div>
       </div>
 
-      <div className="quick-actions" role="group" aria-label="Quick actions">
+      <div
+        className="quick-actions"
+        role="group"
+        aria-label={t('dash.quickActions')}
+      >
         <button
           type="button"
           className="qa-btn"
@@ -448,8 +470,8 @@ export default function Dashboard() {
             +
           </span>
           <span className="qa-text">
-            <strong>New client</strong>
-            <small>Save a name &amp; phone</small>
+            <strong>{t('dash.qaNewClient')}</strong>
+            <small>{t('dash.qaNewClientSub')}</small>
           </span>
         </button>
         <button
@@ -461,8 +483,8 @@ export default function Dashboard() {
             ✦
           </span>
           <span className="qa-text">
-            <strong>New order</strong>
-            <small>Quote &amp; payments</small>
+            <strong>{t('dash.qaNewOrder')}</strong>
+            <small>{t('dash.qaNewOrderSub')}</small>
           </span>
         </button>
         <button
@@ -474,25 +496,26 @@ export default function Dashboard() {
             ⌖
           </span>
           <span className="qa-text">
-            <strong>My Exposing</strong>
-            <small>Where to go &amp; collect</small>
+            <strong>{t('dash.qaField')}</strong>
+            <small>{t('dash.qaFieldSub')}</small>
           </span>
         </button>
       </div>
 
       {!isFresh &&
       (thisWeekOrderRows.length > 0 || thisWeekVisitRows.length > 0) ? (
-        <section className="card dash-week-snapshot" aria-label="This week">
+        <section
+          className="card dash-week-snapshot"
+          aria-label={t('dash.thisWeek')}
+        >
           <div className="dash-week-head">
-            <h3 className="dash-week-title">This week</h3>
+            <h3 className="dash-week-title">{t('dash.thisWeek')}</h3>
             <p className="dash-week-range muted small">{thisWeekRangeText}</p>
           </div>
-          <p className="dash-week-lead muted small">
-            Calendar week (Mon–Sun): jobs and outside visits that touch these dates.
-          </p>
+          <p className="dash-week-lead muted small">{t('dash.thisWeekLead')}</p>
           {thisWeekOrderRows.length > 0 ? (
             <div className="dash-week-block">
-              <h4 className="dash-week-block-title">Orders</h4>
+              <h4 className="dash-week-block-title">{t('dash.weekOrders')}</h4>
               <ul className="dash-reminder-list">
                 {weekOrdersPage.slice.map(({order, client, when}) => (
                   <li key={order.id}>
@@ -508,7 +531,9 @@ export default function Dashboard() {
                         <strong>{order.title}</strong>
                         <span className="muted small">{client}</span>
                       </span>
-                      <span className="dash-reminder-meta muted small">{when}</span>
+                      <span className="dash-reminder-meta muted small">
+                        {when}
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -526,7 +551,7 @@ export default function Dashboard() {
           ) : null}
           {thisWeekVisitRows.length > 0 ? (
             <div className="dash-week-block">
-              <h4 className="dash-week-block-title">My Exposing</h4>
+              <h4 className="dash-week-block-title">{t('dash.weekVisits')}</h4>
               <ul className="dash-reminder-list">
                 {weekVisitsPage.slice.map(({v, rangeLabel}) => (
                   <li key={v.id}>
@@ -544,7 +569,9 @@ export default function Dashboard() {
                           <span className="muted small">{v.venue}</span>
                         ) : null}
                       </span>
-                      <span className="dash-reminder-meta muted small">{rangeLabel}</span>
+                      <span className="dash-reminder-meta muted small">
+                        {rangeLabel}
+                      </span>
                     </button>
                   </li>
                 ))}
@@ -566,26 +593,22 @@ export default function Dashboard() {
       {isFresh ? (
         <div className="welcome-banner">
           <div className="welcome-banner-glow" aria-hidden="true" />
-          <h3 className="welcome-title">Your desk is ready</h3>
-          <p className="welcome-copy">
-            Add a client and an order for studio jobs—or open{' '}
-            <strong>My Exposing</strong> for outside shoots (whose place, what
-            to collect).
-          </p>
+          <h3 className="welcome-title">{t('dash.welcomeTitle')}</h3>
+          <p className="welcome-copy">{t('dash.welcomeCopy')}</p>
           <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem'}}>
             <button
               type="button"
               className="btn primary btn-lg shine"
               onClick={() => setTab('clients')}
             >
-              Start with a client
+              {t('dash.welcomeClient')}
             </button>
             <button
               type="button"
               className="btn btn-lg"
               onClick={() => setTab('field')}
             >
-              Log My Exposing
+              {t('dash.welcomeField')}
             </button>
           </div>
         </div>
@@ -597,49 +620,52 @@ export default function Dashboard() {
           className="stat-tile stat-tile-1"
           onClick={() => setTab('clients')}
         >
-          <span className="stat-label">Clients</span>
+          <span className="stat-label">{t('dash.statClients')}</span>
           <span className="stat-value">{clients.length}</span>
-          <span className="stat-hint">Tap to manage</span>
+          <span className="stat-hint">{t('dash.statHintManage')}</span>
         </button>
         <button
           type="button"
           className="stat-tile stat-tile-2"
           onClick={() => setTab('orders')}
         >
-          <span className="stat-label">Orders</span>
+          <span className="stat-label">{t('dash.statOrders')}</span>
           <span className="stat-value">{orders.length}</span>
-          <span className="stat-hint">Tap to open</span>
+          <span className="stat-hint">{t('dash.statHintOpen')}</span>
         </button>
         <button
           type="button"
           className="stat-tile stat-tile-3"
           onClick={() => setTab('field')}
         >
-          <span className="stat-label">My Exposing</span>
+          <span className="stat-label">{t('dash.statField')}</span>
           <span className="stat-value">{visitCount}</span>
-          <span className="stat-hint">Outside shoots</span>
+          <span className="stat-hint">{t('dash.statHintOutside')}</span>
         </button>
         <div className="stat-tile stat-tile-4 stat-tile-static">
-          <span className="stat-label">Due (future jobs)</span>
+          <span className="stat-label">{t('dash.statDueFuture')}</span>
           <span className="stat-value stat-value-money">
             {formatINR(totalClientDue)}
           </span>
-          <span className="stat-hint">Open jobs only — closed hidden</span>
+          <span className="stat-hint">{t('dash.statDueFutureHint')}</span>
         </div>
         <div
           className="stat-tile stat-tile-owes-clients stat-tile-static"
-          title="Studio order dues plus My Exposing gross (every row). Not the same-person visit net tile."
+          title={t('dash.tileCollectTitle')}
         >
-          <span className="stat-label">To collect (desk)</span>
+          <span className="stat-label">{t('dash.statCollectDesk')}</span>
           <span className="stat-value stat-value-money warn">
             {formatINR(totalCollectStudioPlusExposingGross)}
           </span>
           <span className="stat-hint">
-            Studio {formatINR(totalAllClientsStudioDue)} + exposing {formatINR(totalAllVisitsDueGrossAll)} · gross
+            {t('dash.statCollectHint', {
+              studio: formatINR(totalAllClientsStudioDue),
+              exposing: formatINR(totalAllVisitsDueGrossAll),
+            })}
           </span>
         </div>
         <div className="stat-tile stat-tile-5 stat-tile-static">
-          <span className="stat-label">Est. profit (all time)</span>
+          <span className="stat-label">{t('dash.statProfit')}</span>
           <span
             className={`stat-value stat-value-money ${
               profit.netEstimate > 0
@@ -652,17 +678,18 @@ export default function Dashboard() {
             {formatINR(profit.netEstimate)}
           </span>
           <span className="stat-hint">
-            Received {formatINR(profit.totalReceived)} − team{' '}
-            {formatINR(profit.teamPayouts)} − guest pay (net){' '}
-            {formatINR(profit.guestPayCommitted)}
+            {t('dash.statProfitHint', {
+              recv: formatINR(profit.totalReceived),
+              team: formatINR(profit.teamPayouts),
+              guest: formatINR(profit.guestPayCommitted),
+            })}
             {profit.guestPayRaw > profit.guestPayCommitted ? (
               <>
                 {' '}
-                <span
-                  className="muted"
-                  title="Same-person My Exposing due reduces Pay them in this total."
-                >
-                  (was {formatINR(profit.guestPayRaw)} before visit offset)
+                <span className="muted" title={t('dash.guestPayTitle')}>
+                  {t('dash.statProfitWas', {
+                    raw: formatINR(profit.guestPayRaw),
+                  })}
                 </span>
               </>
             ) : null}
@@ -673,51 +700,45 @@ export default function Dashboard() {
           className="stat-tile stat-tile-6"
           onClick={() => setTab('field')}
         >
-          <span className="stat-label">Pending (visits)</span>
+          <span className="stat-label">{t('dash.statPendingVisits')}</span>
           <span className="stat-value stat-value-money ok">
             {formatINR(totalVisitDueNet)}
           </span>
           {totalVisitDueGross > totalVisitDueNet ? (
             <span className="stat-gross-note">
-              Gross on visits <strong>{formatINR(totalVisitDueGross)}</strong>
+              {t('dash.statGrossVisits', {amt: formatINR(totalVisitDueGross)})}
             </span>
           ) : null}
-          <span className="stat-hint">Net after studio pay (same person)</span>
+          <span className="stat-hint">{t('dash.statPendingHint')}</span>
         </button>
       </div>
 
       <div className="dash-grid">
         <section className="card card-lift dash-card">
           <div className="dash-card-head">
-            <h3>Upcoming orders</h3>
-            <p className="dash-card-subtitle">
-              Jobs whose event is still running or coming up (end date today or later—or no event date yet). After the
-              event, once fully paid, they become <strong>Closed</strong> and leave this list. Past events with a
-              balance due stay in <strong>Orders</strong> until paid (status updates there).
-            </p>
+            <h3>{t('dash.upcomingOrders')}</h3>
+            <p className="dash-card-subtitle">{t('dash.upcomingOrdersSub')}</p>
           </div>
           {futureOrderRows.length === 0 ? (
             <div className="dash-empty dash-empty--orders">
               <span className="dash-empty-icon" aria-hidden="true">
                 ✦
               </span>
-              <p className="dash-empty-title">No upcoming orders</p>
-              <p className="dash-empty-text">
-                Nothing on the calendar through today for open jobs. Orders with payment still due after the event
-                still appear in <strong>Orders</strong> with amount due until settled.
-              </p>
+              <p className="dash-empty-title">{t('dash.noUpcomingTitle')}</p>
+              <p className="dash-empty-text">{t('dash.noUpcomingText')}</p>
               <button
                 type="button"
                 className="btn primary btn-sm shine"
                 onClick={() => setTab('orders')}
               >
-                New order
+                {t('dash.qaNewOrder')}
               </button>
             </div>
           ) : (
             <ul className="dash-feed">
               {futureOrderRows.map(({order, received, due, total}) => {
-                const cname = clientById.get(order.clientId)?.name || '—'
+                const cname =
+                  clientById.get(order.clientId)?.name || t('common.dash')
                 const dueOutstanding = Math.max(0, due)
                 const overpaid = due < 0
                 const whenLabel = upcomingOrderWhenLabel(order)
@@ -732,21 +753,23 @@ export default function Dashboard() {
                         <span
                           className={`order-workflow-pill order-workflow-pill--${deriveOrderWorkflowStatus(order, todayDesk)}`}
                         >
-                          {orderWorkflowLabel(deriveOrderWorkflowStatus(order, todayDesk))}
+                          {orderWorkflowLabel(
+                            deriveOrderWorkflowStatus(order, todayDesk),
+                          )}
                         </span>
                       </div>
                       {whenLabel ? (
                         <div className="dash-order-when">
                           <span
                             className="dash-pill-date"
-                            title="Event / shoot dates for this order"
+                            title={t('dash.orderWhenTitle')}
                           >
                             {whenLabel}
                           </span>
                         </div>
                       ) : (
                         <p className="dash-order-when dash-order-when--empty muted small">
-                          No event date — set in order
+                          {t('dash.noEventDate')}
                         </p>
                       )}
                       <div className="dash-feed-client">{cname}</div>
@@ -758,21 +781,27 @@ export default function Dashboard() {
                         </div>
                       ) : overpaid ? (
                         <div className="dash-feed-due dash-feed-due--overpaid">
-                          Overpaid {formatINR(-due)}
+                          {t('dash.overpaid', {amt: formatINR(-due)})}
                         </div>
                       ) : (
                         <div className="dash-feed-due dash-feed-due--paid">
-                          Paid up
+                          {t('dash.paidUp')}
                         </div>
                       )}
                       <div className="dash-feed-received">
                         {total > 0 ? (
                           <>
-                            Total {formatINR(total)} · Received{' '}
-                            {formatINR(received)}
+                            {t('dash.totalReceived', {
+                              total: formatINR(total),
+                              recv: formatINR(received),
+                            })}
                           </>
                         ) : (
-                          <>Received {formatINR(received)}</>
+                          <>
+                            {t('dash.receivedOnly', {
+                              recv: formatINR(received),
+                            })}
+                          </>
                         )}
                       </div>
                     </div>
@@ -785,9 +814,9 @@ export default function Dashboard() {
 
         <section className="card card-lift dash-card">
           <div className="dash-card-head">
-            <h3>Visit collections</h3>
+            <h3>{t('dash.visitCollections')}</h3>
             <p className="dash-card-subtitle">
-              Upcoming shoots where you still need to collect.
+              {t('dash.visitCollectionsSub')}
             </p>
           </div>
           {dashboardVisitRows.length === 0 ? (
@@ -795,16 +824,14 @@ export default function Dashboard() {
               <span className="dash-empty-icon" aria-hidden="true">
                 ⌖
               </span>
-              <p className="dash-empty-title">No pending collections</p>
-              <p className="dash-empty-text">
-                Log My Exposing with an amount to see it here.
-              </p>
+              <p className="dash-empty-title">{t('dash.noVisitsTitle')}</p>
+              <p className="dash-empty-text">{t('dash.noVisitsText')}</p>
               <button
                 type="button"
                 className="btn primary btn-sm shine"
                 onClick={() => setTab('field')}
               >
-                Add visit
+                {t('dash.addVisit')}
               </button>
             </div>
           ) : (
@@ -822,7 +849,11 @@ export default function Dashboard() {
                       <div className="dash-visit-when">
                         <span
                           className="dash-pill-date"
-                          title={isRange ? 'From – to' : 'Single day'}
+                          title={
+                            isRange
+                              ? t('dash.fromToTitle')
+                              : t('dash.singleDayTitle')
+                          }
                         >
                           {rangeLabel}
                         </span>
@@ -837,7 +868,7 @@ export default function Dashboard() {
                         <div className="dash-visit-venue muted">{v.venue}</div>
                       ) : null}
                       <div className="dash-visit-due">
-                        <span className="muted">Still due</span>
+                        <span className="muted">{t('dash.stillDueLabel')}</span>
                         <span
                           className={
                             due > 0
@@ -858,7 +889,7 @@ export default function Dashboard() {
                   className="btn primary btn-sm shine"
                   onClick={() => setTab('field')}
                 >
-                  Open My Exposing
+                  {t('dash.openField')}
                 </button>
               </div>
             </>
@@ -868,27 +899,36 @@ export default function Dashboard() {
         {clientsWithBalanceDue.length > 0 || totalAllVisitsDueGrossAll > 0 ? (
           <section
             className="card card-lift dash-card card-wide"
-            aria-label="Balances to collect"
+            aria-label={t('dash.balancesTitle')}
           >
             <div className="dash-card-head">
-              <h3>Balances to collect</h3>
-              <p className="dash-card-subtitle">
-                <strong>Studio</strong> = all client orders with something left to collect.{' '}
-                <strong>My Exposing</strong> = gross still due on each outside visit (amount − collected), all dates.
-                Combined is a simple sum — not the &quot;same person&quot; net from the Pending (visits) tile.
-              </p>
+              <h3>{t('dash.balancesTitle')}</h3>
+              <p className="dash-card-subtitle">{t('dash.balancesSub')}</p>
             </div>
-            <div className="dash-clients-grand-total dash-clients-grand-total--stack" role="status">
+            <div
+              className="dash-clients-grand-total dash-clients-grand-total--stack"
+              role="status"
+            >
               <div className="dash-clients-grand-total-row">
-                <span className="dash-clients-grand-total-label">Studio (all clients)</span>
-                <span className="dash-clients-grand-total-subval">{formatINR(totalAllClientsStudioDue)}</span>
+                <span className="dash-clients-grand-total-label">
+                  {t('dash.studioAll')}
+                </span>
+                <span className="dash-clients-grand-total-subval">
+                  {formatINR(totalAllClientsStudioDue)}
+                </span>
               </div>
               <div className="dash-clients-grand-total-row">
-                <span className="dash-clients-grand-total-label">My Exposing (gross)</span>
-                <span className="dash-clients-grand-total-subval">{formatINR(totalAllVisitsDueGrossAll)}</span>
+                <span className="dash-clients-grand-total-label">
+                  {t('dash.exposingGross')}
+                </span>
+                <span className="dash-clients-grand-total-subval">
+                  {formatINR(totalAllVisitsDueGrossAll)}
+                </span>
               </div>
               <div className="dash-clients-grand-total-row dash-clients-grand-total-row--total">
-                <span className="dash-clients-grand-total-label">Total desk</span>
+                <span className="dash-clients-grand-total-label">
+                  {t('dash.totalDesk')}
+                </span>
                 <span className="dash-clients-grand-total-value">
                   {formatINR(totalCollectStudioPlusExposingGross)}
                 </span>
@@ -898,16 +938,29 @@ export default function Dashboard() {
               <>
                 <ul className="dash-feed">
                   {balancesPage.slice.map(row => (
-                    <li key={row.clientId} className="dash-feed-item dash-feed-item--client">
+                    <li
+                      key={row.clientId}
+                      className="dash-feed-item dash-feed-item--client"
+                    >
                       <div>
                         <div className="dash-feed-title">{row.name}</div>
                         <div className="muted small">
-                          {row.orderCount} {row.orderCount === 1 ? 'job' : 'jobs'} with balance
+                          {t('dash.jobsWithBalance', {
+                            count: row.orderCount,
+                            jobs:
+                              row.orderCount === 1
+                                ? t('common.job')
+                                : t('common.jobs'),
+                          })}
                         </div>
                       </div>
                       <div className="dash-feed-money">
-                        <div className="dash-feed-due">{formatINR(row.dueSum)}</div>
-                        <div className="dash-feed-received">to collect</div>
+                        <div className="dash-feed-due">
+                          {formatINR(row.dueSum)}
+                        </div>
+                        <div className="dash-feed-received">
+                          {t('dash.toCollect')}
+                        </div>
                       </div>
                     </li>
                   ))}
@@ -924,15 +977,30 @@ export default function Dashboard() {
               </>
             ) : (
               <p className="muted small" style={{margin: '0 0 0.75rem'}}>
-                No studio balances by client right now. Use <strong>My Exposing</strong> for outside collections.
+                {t('dash.noStudioBalances')}
               </p>
             )}
-            <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.35rem'}}>
-              <button type="button" className="btn primary btn-sm shine" onClick={() => setTab('orders')}>
-                Open orders
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                marginTop: '0.35rem',
+              }}
+            >
+              <button
+                type="button"
+                className="btn primary btn-sm shine"
+                onClick={() => setTab('orders')}
+              >
+                {t('dash.openOrders')}
               </button>
-              <button type="button" className="btn btn-sm" onClick={() => setTab('field')}>
-                My Exposing
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setTab('field')}
+              >
+                {t('dash.qaField')}
               </button>
             </div>
           </section>
@@ -940,39 +1008,29 @@ export default function Dashboard() {
 
         <section className="card card-lift dash-card card-wide dash-card--settle">
           <div className="dash-card-head">
-            <h3>Same-person net</h3>
-            <p className="dash-card-subtitle">
-              Field <strong>due</strong> minus studio <strong>Pay them</strong>{' '}
-              when it&apos;s the same contact (name or Match key).
-            </p>
+            <h3>{t('dash.settleTitle')}</h3>
+            <p className="dash-card-subtitle">{t('dash.settleSub')}</p>
           </div>
           {settlementHint ? (
-            <p className="dash-settle-hint">
-              Studio pay and visit money both exist, but nothing linked—use the
-              same <strong>Match key</strong> on the guest and the visit (or
-              similar names).
-            </p>
+            <p className="dash-settle-hint">{t('dash.settleHint')}</p>
           ) : null}
           {settlementRows.length === 0 ? (
             <div className="dash-empty dash-empty--settle">
               <span className="dash-empty-icon" aria-hidden="true">
                 ⇄
               </span>
-              <p className="dash-empty-title">No offsets yet</p>
-              <p className="dash-empty-text">
-                Add &quot;Pay them&quot; on an exposure guest and My Exposing
-                for the same person.
-              </p>
+              <p className="dash-empty-title">{t('dash.settleEmptyTitle')}</p>
+              <p className="dash-empty-text">{t('dash.settleEmptyText')}</p>
             </div>
           ) : (
             <div className="settlement-table-wrap">
               <table className="settlement-table">
                 <thead>
                   <tr>
-                    <th>Person</th>
-                    <th>You pay (studio)</th>
-                    <th>Still due (visit)</th>
-                    <th>Net for you</th>
+                    <th>{t('dash.tblPerson')}</th>
+                    <th>{t('dash.tblPayStudio')}</th>
+                    <th>{t('dash.tblDueVisit')}</th>
+                    <th>{t('dash.tblNet')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -990,17 +1048,17 @@ export default function Dashboard() {
                       </td>
                       <td>
                         {r.net === 0 && r.hasBothSides ? (
-                          <span className="ok">Even on these two</span>
+                          <span className="ok">{t('dash.netEven')}</span>
                         ) : r.net > 0 ? (
                           <span className="warn">
-                            Collect <strong>{formatINR(r.net)}</strong>
+                            {t('dash.netCollect', {amt: formatINR(r.net)})}
                           </span>
                         ) : r.net < 0 ? (
                           <span>
-                            Pay <strong>{formatINR(-r.net)}</strong> net
+                            {t('dash.netPay', {amt: formatINR(-r.net)})}
                           </span>
                         ) : (
-                          <span className="muted">—</span>
+                          <span className="muted">{t('common.dash')}</span>
                         )}
                       </td>
                     </tr>

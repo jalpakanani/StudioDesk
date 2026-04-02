@@ -49,7 +49,51 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
   const [state, setState] = useState(emptyState);
   const [hydrated, setHydrated] = useState(!useCloud);
   const [syncError, setSyncError] = useState(null);
+  const [actionBusy, setActionBusy] = useState(false);
   const skipNextPersist = useRef(false);
+  const actionBusyNestRef = useRef(0);
+  const actionBusyMountedRef = useRef(true);
+
+  /** Brief global loader on any data mutation (local updates are instant; cloud lags behind). */
+  const MIN_ACTION_BUSY_MS = 280;
+  const wrapMutation = useCallback((fn) => {
+    return (...args) => {
+      actionBusyNestRef.current += 1;
+      if (actionBusyNestRef.current === 1) {
+        setActionBusy(true);
+      }
+      const t0 =
+        typeof performance !== 'undefined' && performance.now
+          ? performance.now()
+          : Date.now();
+      try {
+        return fn(...args);
+      } finally {
+        const now =
+          typeof performance !== 'undefined' && performance.now
+            ? performance.now()
+            : Date.now();
+        const delay = Math.max(0, MIN_ACTION_BUSY_MS - (now - t0));
+        setTimeout(() => {
+          actionBusyNestRef.current -= 1;
+          if (actionBusyNestRef.current <= 0) {
+            actionBusyNestRef.current = 0;
+            if (actionBusyMountedRef.current) {
+              setActionBusy(false);
+            }
+          }
+        }, delay);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    actionBusyMountedRef.current = true;
+    return () => {
+      actionBusyMountedRef.current = false;
+      actionBusyNestRef.current = 0;
+    };
+  }, []);
 
   useEffect(() => {
     setSyncError(null);
@@ -149,7 +193,8 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
     return () => window.clearTimeout(t);
   }, [state, useCloud, syncUserId, hydrated]);
 
-  const addClient = useCallback((payload) => {
+  /* eslint-disable react-hooks/exhaustive-deps -- mutators use stable wrapMutation(); inner fns only call setState */
+  const addClient = useCallback(wrapMutation((payload) => {
     const row = {
       id: uid(),
       name: String(payload.name || '').trim(),
@@ -159,9 +204,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
     if (!row.name) return null;
     setState((s) => ({ ...s, clients: [...s.clients, row] }));
     return row;
-  }, []);
+  }), [wrapMutation]);
 
-  const updateClient = useCallback((id, payload) => {
+  const updateClient = useCallback(wrapMutation((id, payload) => {
     setState((s) => ({
       ...s,
       clients: s.clients.map((c) =>
@@ -175,17 +220,17 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
           : c
       ),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const removeClient = useCallback((id) => {
+  const removeClient = useCallback(wrapMutation((id) => {
     setState((s) => ({
       ...s,
       clients: s.clients.filter((c) => c.id !== id),
       orders: s.orders.filter((o) => o.clientId !== id),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const addOrder = useCallback((payload) => {
+  const addOrder = useCallback(wrapMutation((payload) => {
     const evFrom = String(payload.eventDateFrom || '').slice(0, 10);
     let evTo = String(payload.eventDateTo || '').slice(0, 10);
     if (evFrom && !evTo) evTo = evFrom;
@@ -207,20 +252,20 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
     if (!row.clientId || !row.title) return null;
     setState((s) => ({ ...s, orders: [...s.orders, row] }));
     return row;
-  }, []);
+  }), [wrapMutation]);
 
-  const updateOrder = useCallback((id, patch) => {
+  const updateOrder = useCallback(wrapMutation((id, patch) => {
     setState((s) => ({
       ...s,
       orders: s.orders.map((o) => (o.id === id ? { ...o, ...patch, id: o.id } : o)),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const removeOrder = useCallback((id) => {
+  const removeOrder = useCallback(wrapMutation((id) => {
     setState((s) => ({ ...s, orders: s.orders.filter((o) => o.id !== id) }));
-  }, []);
+  }), [wrapMutation]);
 
-  const addClientPayment = useCallback((orderId, p) => {
+  const addClientPayment = useCallback(wrapMutation((orderId, p) => {
     const pay = {
       id: uid(),
       amount: Number(p.amount) || 0,
@@ -233,9 +278,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         o.id === orderId ? { ...o, clientPayments: [...(o.clientPayments || []), pay] } : o
       ),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const removeClientPayment = useCallback((orderId, paymentId) => {
+  const removeClientPayment = useCallback(wrapMutation((orderId, paymentId) => {
     setState((s) => ({
       ...s,
       orders: s.orders.map((o) =>
@@ -244,9 +289,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
           : o
       ),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const addExposure = useCallback((orderId, payload) => {
+  const addExposure = useCallback(wrapMutation((orderId, payload) => {
     const ex = {
       id: uid(),
       date: payload.date || new Date().toISOString().slice(0, 10),
@@ -261,9 +306,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         o.id === orderId ? { ...o, exposures: [...(o.exposures || []), ex] } : o
       ),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const updateExposure = useCallback((orderId, exposureId, patch) => {
+  const updateExposure = useCallback(wrapMutation((orderId, exposureId, patch) => {
     setState((s) => ({
       ...s,
       orders: s.orders.map((o) => {
@@ -276,9 +321,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         };
       }),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const removeExposure = useCallback((orderId, exposureId) => {
+  const removeExposure = useCallback(wrapMutation((orderId, exposureId) => {
     setState((s) => ({
       ...s,
       orders: s.orders.map((o) =>
@@ -287,9 +332,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
           : o
       ),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const addTeamMember = useCallback((orderId, exposureId, payload) => {
+  const addTeamMember = useCallback(wrapMutation((orderId, exposureId, payload) => {
     const member = {
       id: uid(),
       name: String(payload.name || '').trim(),
@@ -310,9 +355,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         };
       }),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const updateTeamMember = useCallback((orderId, exposureId, memberId, patch) => {
+  const updateTeamMember = useCallback(wrapMutation((orderId, exposureId, memberId, patch) => {
     setState((s) => ({
       ...s,
       orders: s.orders.map((o) => {
@@ -331,9 +376,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         };
       }),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const removeTeamMember = useCallback((orderId, exposureId, memberId) => {
+  const removeTeamMember = useCallback(wrapMutation((orderId, exposureId, memberId) => {
     setState((s) => ({
       ...s,
       orders: s.orders.map((o) => {
@@ -348,9 +393,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         };
       }),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const addTeamPayout = useCallback((orderId, exposureId, memberId, p) => {
+  const addTeamPayout = useCallback(wrapMutation((orderId, exposureId, memberId, p) => {
     const pay = {
       id: uid(),
       amount: Number(p.amount) || 0,
@@ -375,9 +420,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         };
       }),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const removeTeamPayout = useCallback((orderId, exposureId, memberId, payoutId) => {
+  const removeTeamPayout = useCallback(wrapMutation((orderId, exposureId, memberId, payoutId) => {
     setState((s) => ({
       ...s,
       orders: s.orders.map((o) => {
@@ -398,9 +443,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         };
       }),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const addFieldVisit = useCallback((payload) => {
+  const addFieldVisit = useCallback(wrapMutation((payload) => {
     const dateFrom =
       String(payload.dateFrom || payload.date || '').slice(0, 10) ||
       new Date().toISOString().slice(0, 10);
@@ -422,9 +467,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
     if (!row.hostName) return null;
     setState((s) => ({ ...s, fieldVisits: [...(s.fieldVisits || []), row] }));
     return row;
-  }, []);
+  }), [wrapMutation]);
 
-  const updateFieldVisit = useCallback((id, patch) => {
+  const updateFieldVisit = useCallback(wrapMutation((id, patch) => {
     setState((s) => ({
       ...s,
       fieldVisits: (s.fieldVisits || []).map((v) => {
@@ -451,13 +496,13 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         };
       }),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const removeFieldVisit = useCallback((id) => {
+  const removeFieldVisit = useCallback(wrapMutation((id) => {
     setState((s) => ({ ...s, fieldVisits: (s.fieldVisits || []).filter((v) => v.id !== id) }));
-  }, []);
+  }), [wrapMutation]);
 
-  const addFieldVisitCollection = useCallback((visitId, p) => {
+  const addFieldVisitCollection = useCallback(wrapMutation((visitId, p) => {
     const pay = {
       id: uid(),
       amount: Number(p.amount) || 0,
@@ -470,9 +515,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         v.id === visitId ? { ...v, collections: [...(v.collections || []), pay] } : v
       ),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const removeFieldVisitCollection = useCallback((visitId, collectionId) => {
+  const removeFieldVisitCollection = useCallback(wrapMutation((visitId, collectionId) => {
     setState((s) => ({
       ...s,
       fieldVisits: (s.fieldVisits || []).map((v) =>
@@ -481,9 +526,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
           : v
       ),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const addExposureGuest = useCallback((orderId, payload) => {
+  const addExposureGuest = useCallback(wrapMutation((orderId, payload) => {
     const guest = {
       id: uid(),
       name: String(payload.name || '').trim(),
@@ -500,9 +545,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
       ),
     }));
     return guest;
-  }, []);
+  }), [wrapMutation]);
 
-  const updateExposureGuest = useCallback((orderId, guestId, patch) => {
+  const updateExposureGuest = useCallback(wrapMutation((orderId, guestId, patch) => {
     setState((s) => ({
       ...s,
       orders: s.orders.map((o) => {
@@ -524,9 +569,9 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
         };
       }),
     }));
-  }, []);
+  }), [wrapMutation]);
 
-  const removeExposureGuest = useCallback((orderId, guestId) => {
+  const removeExposureGuest = useCallback(wrapMutation((orderId, guestId) => {
     setState((s) => ({
       ...s,
       orders: s.orders.map((o) =>
@@ -535,7 +580,7 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
           : o
       ),
     }));
-  }, []);
+  }), [wrapMutation]);
 
   const clientById = useMemo(() => {
     const m = new Map();
@@ -547,14 +592,15 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
     return JSON.stringify(state, null, 2);
   }, [state]);
 
-  const importJson = useCallback((text) => {
+  const importJson = useCallback(wrapMutation((text) => {
     const parsed = JSON.parse(text);
     setState({
       clients: Array.isArray(parsed.clients) ? parsed.clients : [],
       orders: Array.isArray(parsed.orders) ? parsed.orders : [],
       fieldVisits: normalizeFieldVisits(parsed.fieldVisits),
     });
-  }, []);
+  }), [wrapMutation]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const cloudSync = useCloud && Boolean(syncUserId);
 
@@ -562,6 +608,7 @@ export function useStudioStore({ useCloud = false, syncUserId = null } = {}) {
     ...state,
     clientById,
     studioReady: hydrated,
+    actionBusy,
     cloudSync,
     syncError,
     addClient,

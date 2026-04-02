@@ -1,11 +1,15 @@
 import {useEffect, useMemo, useState} from 'react'
+import {useTranslation} from 'react-i18next'
 import {useStudio} from '../context/StudioContext'
 import {useTab} from '../context/TabContext'
+import {useConfirm} from '../context/ConfirmContext'
 import {formatINR, sumPayments} from '../utils/money'
 import {fieldVisitRange, formatDateRangeEn, formatISODateDisplay} from '../utils/dateRange'
 import {groupedFieldVisitCardStats} from '../utils/settlement'
 
 export default function FieldVisitsView() {
+  const {t} = useTranslation()
+  const {confirmAsync} = useConfirm()
   const {navFocus, clearNavFocus} = useTab()
   const {
     orders,
@@ -129,52 +133,46 @@ export default function FieldVisitsView() {
     <div className="panel">
       <div className="panel-head">
         <div>
-          <h2 className="panel-title">My Exposing</h2>
-          <p className="panel-lead panel-lead--tight">
-            Outside shoot: who, where, how much they pay you. Multi-day? Set{' '}
-            <strong>To</strong> date.
-          </p>
+          <h2 className="panel-title">{t('field.title')}</h2>
+          <p className="panel-lead panel-lead--tight">{t('field.lead')}</p>
           <details className="panel-tip">
-            <summary>Same person on an order?</summary>
+            <summary>{t('field.tipSummary')}</summary>
             <p
               className="muted small"
               style={{margin: '0.5rem 0 0', lineHeight: 1.5, maxWidth: '34rem'}}
             >
-              If you also <strong>Pay them</strong> on an order (exposure
-              guest), use the <strong>same match key</strong> on both. The card
-              then shows what you collect, what you owe on the order, and the{' '}
-              <strong>net</strong>.
+              {t('field.tipBody')}
             </p>
           </details>
         </div>
       </div>
 
       <div className="glass-panel">
-        <h3 className="glass-panel-title">Add entry</h3>
+        <h3 className="glass-panel-title">{t('field.addEntry')}</h3>
         <form
           className="form-grid"
           onSubmit={submitNew}
           style={{marginBottom: 0}}
         >
           <label>
-            Whose place / who *
+            {t('field.labelHost')}
             <input
-              placeholder="e.g. Rahul, Meera aunty, XYZ studio"
+              placeholder={t('field.hostPlaceholder')}
               value={hostName}
               onChange={e => setHostName(e.target.value)}
               required
             />
           </label>
           <label>
-            Venue or address
+            {t('field.labelVenue')}
             <input
-              placeholder="Area, full address, landmark…"
+              placeholder={t('field.venuePlaceholder')}
               value={venue}
               onChange={e => setVenue(e.target.value)}
             />
           </label>
           <label>
-            From date *
+            {t('field.labelFrom')}
             <input
               type="date"
               lang="en-IN"
@@ -184,7 +182,7 @@ export default function FieldVisitsView() {
             />
           </label>
           <label>
-            To date
+            {t('field.labelTo')}
             <input
               type="date"
               lang="en-IN"
@@ -194,15 +192,15 @@ export default function FieldVisitsView() {
             />
           </label>
           <label>
-            Time
+            {t('field.labelTime')}
             <input
-              placeholder='e.g. 4pm or "all day"'
+              placeholder={t('field.timePlaceholder')}
               value={time}
               onChange={e => setTime(e.target.value)}
             />
           </label>
           <label>
-            Amount to collect (₹) *
+            {t('field.labelAmount')}
             <input
               type="number"
               min="0"
@@ -213,32 +211,32 @@ export default function FieldVisitsView() {
             />
           </label>
           <label>
-            Match key (optional)
+            {t('field.labelMatch')}
             <input
-              placeholder="Same as order Pay them row, e.g. sandip"
+              placeholder={t('field.matchPlaceholder')}
               value={partyKey}
               onChange={e => setPartyKey(e.target.value)}
             />
           </label>
           <label className="full">
-            Notes
+            {t('common.notes')}
             <textarea
               rows={2}
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="Package, deliverables…"
+              placeholder={t('field.notesPlaceholder')}
             />
           </label>
           <div className="form-actions full">
             <button type="submit" className="btn primary shine">
-              Save
+              {t('common.save')}
             </button>
           </div>
         </form>
       </div>
 
       <h3 className="subhead" style={{marginTop: '1.25rem'}}>
-        Entries ({sorted.length})
+        {t('field.entries', {count: sorted.length})}
       </h3>
 
       {sorted.length === 0 ? (
@@ -254,7 +252,7 @@ export default function FieldVisitsView() {
             🚐
           </div>
           <p className="muted" style={{margin: 0, maxWidth: '320px'}}>
-            Nothing saved yet. Add one above when you book an outside job.
+            {t('field.emptyText')}
           </p>
         </div>
       ) : (
@@ -281,7 +279,7 @@ export default function FieldVisitsView() {
                 {editingId === v.id ? (
                   <form className="form-grid tight" onSubmit={saveEdit}>
                     <label>
-                      Whose place / who *
+                      {t('field.labelHost')}
                       <input
                         value={eh}
                         onChange={e => setEh(e.target.value)}
@@ -289,11 +287,11 @@ export default function FieldVisitsView() {
                       />
                     </label>
                     <label>
-                      Venue
+                      {t('field.labelVenueShort')}
                       <input value={ev} onChange={e => setEv(e.target.value)} />
                     </label>
                     <label>
-                      From date *
+                      {t('field.labelFrom')}
                       <input
                         type="date"
                         lang="en-IN"
@@ -303,7 +301,7 @@ export default function FieldVisitsView() {
                       />
                     </label>
                     <label>
-                      To date
+                      {t('field.labelTo')}
                       <input
                         type="date"
                         lang="en-IN"
@@ -313,11 +311,11 @@ export default function FieldVisitsView() {
                       />
                     </label>
                     <label>
-                      Time
+                      {t('field.labelTime')}
                       <input value={et} onChange={e => setEt(e.target.value)} />
                     </label>
                     <label>
-                      Amount to collect (₹) *
+                      {t('field.labelAmount')}
                       <input
                         type="number"
                         min="0"
@@ -327,15 +325,15 @@ export default function FieldVisitsView() {
                       />
                     </label>
                     <label>
-                      Match key
+                      {t('orders.matchKey')}
                       <input
-                        placeholder="Same as exposure guest"
+                        placeholder={t('field.matchEditPlaceholder')}
                         value={epk}
                         onChange={e => setEpk(e.target.value)}
                       />
                     </label>
                     <label className="full">
-                      Notes
+                      {t('common.notes')}
                       <textarea
                         rows={2}
                         value={en}
@@ -343,15 +341,15 @@ export default function FieldVisitsView() {
                       />
                     </label>
                     <div className="form-actions full">
-                      <button type="submit" className="btn primary btn-sm">
-                        Save changes
-                      </button>
                       <button
                         type="button"
                         className="btn btn-sm"
                         onClick={() => setEditingId(null)}
                       >
-                        Cancel
+                        {t('common.cancel')}
+                      </button>
+                      <button type="submit" className="btn primary btn-sm">
+                        {t('field.saveChanges')}
                       </button>
                     </div>
                   </form>
@@ -365,10 +363,10 @@ export default function FieldVisitsView() {
                             <span className="muted"> · {v.time}</span>
                           ) : null}
                         </div>
-                        <div className="visit-host">At / with {v.hostName}</div>
+                        <div className="visit-host">{t('field.atWith', {name: v.hostName})}</div>
                         {v.partyKey ? (
                           <div className="muted small">
-                            Match key: {v.partyKey}
+                            {t('orders.matchKeyLabel')} {v.partyKey}
                           </div>
                         ) : null}
                         {v.venue ? (
@@ -380,18 +378,17 @@ export default function FieldVisitsView() {
                       </div>
                       <div
                         className="visit-money visit-money--tiles"
-                        aria-label="Amounts for this contact"
+                        aria-label={t('field.amountsAria')}
                       >
                         {card.visitCount > 1 ? (
                           <p className="visit-money-combine-note muted small">
-                            {card.visitCount} entries, same contact—one combined
-                            total.
+                            {t('field.combineNote', {count: card.visitCount})}
                           </p>
                         ) : null}
                         <div className="visit-money-tiles">
                           <div className="visit-money-tile">
                             <span className="visit-money-tile-label">
-                              To collect
+                              {t('field.toCollect')}
                             </span>
                             <strong className="visit-money-tile-value">
                               {formatINR(total)}
@@ -399,7 +396,7 @@ export default function FieldVisitsView() {
                           </div>
                           <div className="visit-money-tile">
                             <span className="visit-money-tile-label">
-                              Received
+                              {t('field.received')}
                             </span>
                             <span className="visit-money-tile-value">
                               {formatINR(received)}
@@ -409,7 +406,7 @@ export default function FieldVisitsView() {
                             className={`visit-money-tile visit-money-tile--due${due > 0 ? ' is-warn' : ''}`}
                           >
                             <span className="visit-money-tile-label">
-                              Still due
+                              {t('field.stillDue')}
                             </span>
                             <strong
                               className={`visit-money-tile-value ${due > 0 ? 'warn' : 'ok'}`}
@@ -421,7 +418,7 @@ export default function FieldVisitsView() {
                             <>
                               <div className="visit-money-tile">
                                 <span className="visit-money-tile-label">
-                                  Pay on order
+                                  {t('field.payOnOrder')}
                                 </span>
                                 <span className="visit-money-tile-value">
                                   {formatINR(card.payToGuest)}
@@ -437,7 +434,7 @@ export default function FieldVisitsView() {
                                 }`}
                               >
                                 <span className="visit-money-tile-label">
-                                  Net
+                                  {t('field.net')}
                                 </span>
                                 <strong
                                   className={`visit-money-tile-value ${
@@ -449,10 +446,10 @@ export default function FieldVisitsView() {
                                   }`}
                                 >
                                   {card.net > 0
-                                    ? `Collect ${formatINR(card.net)}`
+                                    ? t('field.collectAmt', {amt: formatINR(card.net)})
                                     : card.net < 0
-                                      ? `Pay ${formatINR(-card.net)}`
-                                      : 'Even'}
+                                      ? t('field.payAmt', {amt: formatINR(-card.net)})
+                                      : t('field.even')}
                                 </strong>
                               </div>
                             </>
@@ -466,6 +463,7 @@ export default function FieldVisitsView() {
                       collections={v.collections}
                       addFieldVisitCollection={addFieldVisitCollection}
                       removeFieldVisitCollection={removeFieldVisitCollection}
+                      confirmAsync={confirmAsync}
                     />
 
                     <div className="visit-card-actions">
@@ -474,17 +472,24 @@ export default function FieldVisitsView() {
                         className="btn small"
                         onClick={() => startEdit(v)}
                       >
-                        Edit
+                        {t('common.edit')}
                       </button>
                       <button
                         type="button"
                         className="btn small danger"
                         onClick={() => {
-                          if (window.confirm(`Remove “${v.hostName}”?`))
-                            removeFieldVisit(v.id)
+                          void (async () => {
+                            const ok = await confirmAsync({
+                              title: t('field.confirmDeleteTitle'),
+                              message: t('field.removeConfirm', {name: v.hostName}),
+                              confirmLabel: t('common.delete'),
+                              cancelLabel: t('common.cancel'),
+                            })
+                            if (ok) removeFieldVisit(v.id)
+                          })()
                         }}
                       >
-                        Delete
+                        {t('common.delete')}
                       </button>
                     </div>
                   </>
@@ -503,7 +508,9 @@ function VisitCollections({
   collections,
   addFieldVisitCollection,
   removeFieldVisitCollection,
+  confirmAsync,
 }) {
+  const {t} = useTranslation()
   const [amt, setAmt] = useState('')
   const [dt, setDt] = useState(() => new Date().toISOString().slice(0, 10))
   const [nt, setNt] = useState('')
@@ -518,25 +525,25 @@ function VisitCollections({
   return (
     <div className="visit-collections">
       <strong className="visit-collections-title">
-        Money received from them
+        {t('field.collectionsTitle')}
       </strong>
       <form className="form-row tight" onSubmit={add}>
         <input
           type="number"
           min="0"
-          placeholder="Amount ₹"
+          placeholder={t('field.amountInr')}
           value={amt}
           onChange={e => setAmt(e.target.value)}
           required
         />
         <input type="date" lang="en-IN" value={dt} onChange={e => setDt(e.target.value)} />
         <input
-          placeholder="Note"
+          placeholder={t('orders.payNote')}
           value={nt}
           onChange={e => setNt(e.target.value)}
         />
         <button type="submit" className="btn small primary">
-          Log receipt
+          {t('field.logReceipt')}
         </button>
       </form>
       {(collections || []).length > 0 ? (
@@ -549,7 +556,20 @@ function VisitCollections({
               <button
                 type="button"
                 className="btn tiny danger"
-                onClick={() => removeFieldVisitCollection(visitId, p.id)}
+                onClick={() => {
+                  void (async () => {
+                    const ok = await confirmAsync({
+                      title: t('field.confirmRemoveCollectionTitle'),
+                      message: t('field.removeCollectionConfirm', {
+                        amount: formatINR(p.amount),
+                        date: formatISODateDisplay(p.date),
+                      }),
+                      confirmLabel: t('common.remove'),
+                      cancelLabel: t('common.cancel'),
+                    })
+                    if (ok) removeFieldVisitCollection(visitId, p.id)
+                  })()
+                }}
               >
                 ×
               </button>
@@ -558,7 +578,7 @@ function VisitCollections({
         </ul>
       ) : (
         <p className="muted small" style={{margin: '0.35rem 0 0'}}>
-          No payments logged yet.
+          {t('field.noPayments')}
         </p>
       )}
     </div>

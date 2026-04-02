@@ -13,6 +13,11 @@ import {
   writeReminderSig,
 } from '../utils/reminders';
 import { isOrderWorkflowClosed } from '../utils/orderWorkflow';
+import { readStudioDisplayName } from '../utils/studioDisplayName';
+
+function deskNotificationBrand() {
+  return readStudioDisplayName() || 'My Studio Desk';
+}
 
 /** ~2h 45m → up to 5 pings fit in a typical waking day without stacking too tight. */
 const MIN_GAP_MS = 2.75 * 60 * 60 * 1000;
@@ -89,7 +94,7 @@ export function useReminderNotifications(orders, fieldVisits, clientById) {
             tomorrowSig.length <= 80
               ? `desk-tom-${tomorrowSig}`
               : `desk-tom-${tomorrowSig.slice(0, 40)}-${tomorrowSig.length}`;
-          new Notification('My Studio Desk — tomorrow', {
+          new Notification(`${deskNotificationBrand()} — tomorrow`, {
             body: parts.join(' · '),
             tag,
           });
@@ -115,7 +120,7 @@ export function useReminderNotifications(orders, fieldVisits, clientById) {
           if (payDue.length === 1) {
             const o = payDue[0];
             const due = (Number(o.totalAmount) || 0) - sumPayments(o.clientPayments);
-            new Notification('My Studio Desk — collect payment', {
+            new Notification(`${deskNotificationBrand()} — collect payment`, {
               body: `${orderReminderLabel(o, clientById)}: still due ${formatINR(Math.max(0, due))}`,
               tag: `desk-pay-${o.id}`,
             });
@@ -124,7 +129,7 @@ export function useReminderNotifications(orders, fieldVisits, clientById) {
               .slice(0, 3)
               .map((o) => orderReminderLabel(o, clientById))
               .join(' · ');
-            new Notification('My Studio Desk — collect payment', {
+            new Notification(`${deskNotificationBrand()} — collect payment`, {
               body: `${payDue.length} jobs — ${sample}${payDue.length > 3 ? '…' : ''}. Open your desk.`,
               tag: `desk-pay-b-${paySig.slice(0, 48)}`,
             });

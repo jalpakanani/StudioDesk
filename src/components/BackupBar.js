@@ -1,7 +1,9 @@
 import { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStudio } from '../context/StudioContext';
 
 export default function BackupBar() {
+  const { t } = useTranslation();
   const { exportJson, importJson, cloudSync, syncError } = useStudio();
   const [msg, setMsg] = useState('');
   const fileRef = useRef(null);
@@ -14,7 +16,7 @@ export default function BackupBar() {
     a.download = `studio-desk-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-    setMsg('Download started.');
+    setMsg(t('backup.downloadStarted'));
     setTimeout(() => setMsg(''), 2500);
   }
 
@@ -25,9 +27,9 @@ export default function BackupBar() {
     reader.onload = () => {
       try {
         importJson(String(reader.result));
-        setMsg('Import successful.');
+        setMsg(t('backup.importOk'));
       } catch {
-        setMsg('Invalid file.');
+        setMsg(t('backup.invalidFile'));
       }
       setTimeout(() => setMsg(''), 3000);
     };
@@ -37,10 +39,9 @@ export default function BackupBar() {
 
   const syncErrorBanner = cloudSync && syncError && (
     <div className="sync-error-banner" role="alert">
-      <strong>Cloud sync problem:</strong> {syncError}. Open Firebase → Firestore → Rules and publish the rules from{' '}
-      <code className="sync-error-code">firebase/firestore.rules</code> in this project. If this device uses a
-      <strong> hosted website</strong>, add the same <code className="sync-error-code">REACT_APP_FIREBASE_*</code> keys in
-      the host (Vercel/Netlify env) and rebuild—otherwise this device stays offline-only.
+      <strong>{t('backup.syncProblem')}</strong> {syncError}. {t('backup.syncHelpBeforeRulesFile')}{' '}
+      <code className="sync-error-code">firebase/firestore.rules</code> {t('backup.syncHelpAfterRulesFile')}{' '}
+      <code className="sync-error-code">REACT_APP_FIREBASE_*</code> {t('backup.syncHelpAfterEnv')}
     </div>
   );
 
@@ -56,16 +57,13 @@ export default function BackupBar() {
   return (
     <footer className="backup-bar">
       {syncErrorBanner}
-      <span className="muted small">
-        Data is stored in this browser only (localStorage)—not shared across devices. Add .env.local + login for cloud
-        sync.
-      </span>
+      <span className="muted small">{t('backup.localOnly')}</span>
       <div className="backup-actions">
         <button type="button" className="btn small" onClick={download}>
-          Download JSON backup
+          {t('backup.downloadJson')}
         </button>
         <button type="button" className="btn small" onClick={() => fileRef.current?.click()}>
-          Import JSON
+          {t('backup.importJson')}
         </button>
         <input ref={fileRef} type="file" accept="application/json" hidden onChange={onFile} />
         {msg ? <span className="small">{msg}</span> : null}

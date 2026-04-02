@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStudio } from '../context/StudioContext';
 import { useTab } from '../context/TabContext';
+import { useConfirm } from '../context/ConfirmContext';
 import { formatINR, sumPayments } from '../utils/money';
 import { formatDateRangeEn, formatISODateDisplay, orderEventRange } from '../utils/dateRange';
 import { deriveOrderWorkflowStatus, orderWorkflowLabel } from '../utils/orderWorkflow';
 import { localCalendarTodayISO } from '../utils/reminders';
 
 export default function OrdersView() {
+  const { t } = useTranslation();
   const { setTab, navFocus, clearNavFocus } = useTab();
   const titleRef = useRef(null);
   const {
@@ -82,38 +85,34 @@ export default function OrdersView() {
     <div className="panel">
       <div className="panel-head">
         <div>
-          <h2 className="panel-title">Orders</h2>
-          <p className="panel-lead">
-            Quote, booking date, optional <strong>event from → to</strong> for multi-day functions (e.g. wedding),
-            venue/address, and client payments. <strong>Status</strong> updates from dates and balance (Booked → In
-            progress → Payment pending → Closed).
-          </p>
+          <h2 className="panel-title">{t('orders.title')}</h2>
+          <p className="panel-lead">{t('orders.lead')}</p>
         </div>
       </div>
 
       {!clients.length ? (
         <div className="glass-panel" style={{ marginBottom: '1rem' }}>
-          <h3 className="glass-panel-title">Almost there</h3>
+          <h3 className="glass-panel-title">{t('orders.almostTitle')}</h3>
           <p className="muted" style={{ margin: '0 0 0.85rem' }}>
-            Add a client first—then you can attach orders and track payments.
+            {t('orders.almostText')}
           </p>
           <button type="button" className="btn primary shine" onClick={() => setTab('clients')}>
-            Go to Clients
+            {t('orders.goClients')}
           </button>
         </div>
       ) : null}
 
       <div className="glass-panel">
-        <h3 className="glass-panel-title">New order</h3>
+        <h3 className="glass-panel-title">{t('orders.newOrderForm')}</h3>
         <form className="form-grid" onSubmit={submitOrder} style={{ marginBottom: 0 }}>
           <label>
-            Client *
+            {t('orders.labelClient')}
             <select
               value={newClientId}
               onChange={(e) => setNewClientId(e.target.value)}
               required
             >
-              <option value="">— Select —</option>
+              <option value="">{t('common.select')}</option>
               {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -122,11 +121,11 @@ export default function OrdersView() {
             </select>
           </label>
           <label>
-            Order / event name *
+            {t('orders.labelTitle')}
             <input ref={titleRef} value={newTitle} onChange={(e) => setNewTitle(e.target.value)} required />
           </label>
           <label>
-            Total quote (₹)
+            {t('orders.labelTotal')}
             <input
               type="number"
               min="0"
@@ -135,7 +134,7 @@ export default function OrdersView() {
             />
           </label>
           <label>
-            Order date
+            {t('orders.labelOrderDate')}
             <input
               type="date"
               lang="en-IN"
@@ -144,11 +143,11 @@ export default function OrdersView() {
             />
           </label>
           <label>
-            Event from
+            {t('orders.labelEventFrom')}
             <input type="date" lang="en-IN" value={newEventFrom} onChange={(e) => setNewEventFrom(e.target.value)} />
           </label>
           <label>
-            Event to
+            {t('orders.labelEventTo')}
             <input
               type="date"
               lang="en-IN"
@@ -158,17 +157,17 @@ export default function OrdersView() {
             />
           </label>
           <label className="full">
-            Venue / address
+            {t('orders.labelVenue')}
             <textarea
               rows={2}
               value={newAddress}
               onChange={(e) => setNewAddress(e.target.value)}
-              placeholder="Shoot or delivery address (optional)"
+              placeholder={t('orders.venuePlaceholder')}
             />
           </label>
           <div className="form-actions">
             <button type="submit" className="btn primary shine" disabled={!clients.length}>
-              Create order
+              {t('orders.createOrder')}
             </button>
           </div>
         </form>
@@ -176,7 +175,7 @@ export default function OrdersView() {
 
       <div className="split">
         <div>
-          <h3 className="subhead">Your jobs</h3>
+          <h3 className="subhead">{t('orders.yourJobs')}</h3>
           <ul className="order-pick">
             {orders.length === 0 && clients.length > 0 ? (
               <li>
@@ -184,13 +183,13 @@ export default function OrdersView() {
                   <div className="empty-spotlight-icon" aria-hidden="true">
                     ✦
                   </div>
-                  <h3>No orders yet</h3>
-                  <p>Tap to jump to the form and log your first booking.</p>
+                  <h3>{t('orders.noOrdersTitle')}</h3>
+                  <p>{t('orders.noOrdersText')}</p>
                 </button>
               </li>
             ) : null}
             {orders.length === 0 && !clients.length ? (
-              <li className="muted">Add a client to create orders.</li>
+              <li className="muted">{t('orders.needClient')}</li>
             ) : null}
             {orders.map((o) => {
               const rec = sumPayments(o.clientPayments);
@@ -216,17 +215,21 @@ export default function OrdersView() {
                       </span>
                     </div>
                     <div className="muted small">
-                      {clientById.get(o.clientId)?.name} · Due:{' '}
+                      {clientById.get(o.clientId)?.name} · {t('orders.due')}{' '}
                       <span className={due > 0 ? 'warn' : 'ok'}>{formatINR(Math.max(0, due))}</span>
                     </div>
-                    {evLabel ? <div className="muted small">Event: {evLabel}</div> : null}
+                    {evLabel ? (
+                      <div className="muted small">
+                        {t('orders.event')} {evLabel}
+                      </div>
+                    ) : null}
                     {o.address ? (
                       <div className="muted small" style={{ marginTop: 2 }}>
                         {o.address.length > 72 ? `${o.address.slice(0, 72)}…` : o.address}
                       </div>
                     ) : null}
                     {guestCount > 0 ? (
-                      <div className="pick-guest-hint">{guestCount} coming to studio</div>
+                      <div className="pick-guest-hint">{t('orders.guestsHint', { count: guestCount })}</div>
                     ) : null}
                   </button>
                 </li>
@@ -242,17 +245,17 @@ export default function OrdersView() {
                 📋
               </div>
               <p className="muted" style={{ margin: 0, maxWidth: '240px' }}>
-                Pick a job on the left to edit the quote and client payments.
+                {t('orders.detailEmpty')}
               </p>
               <button type="button" className="btn primary btn-sm shine" onClick={() => setTab('field')}>
-                Outside shoots → My Exposing
+                {t('orders.detailCta')}
               </button>
             </div>
           ) : (
             <OrderDetail
               key={selected.id}
               order={selected}
-              clientName={clientById.get(selected.clientId)?.name || '—'}
+              clientName={clientById.get(selected.clientId)?.name || t('common.dash')}
               updateOrder={updateOrder}
               removeOrder={removeOrder}
               addClientPayment={addClientPayment}
@@ -281,6 +284,8 @@ function OrderDetail({
   removeExposureGuest,
   onDeleted,
 }) {
+  const { t } = useTranslation();
+  const { confirmAsync } = useConfirm();
   const [title, setTitle] = useState(order.title);
   const [totalAmount, setTotalAmount] = useState(String(order.totalAmount ?? ''));
   const [orderDate, setOrderDate] = useState(order.orderDate || '');
@@ -334,43 +339,53 @@ function OrderDetail({
           type="button"
           className="btn small danger"
           onClick={() => {
-            if (window.confirm('Delete this order permanently?')) {
-              removeOrder(order.id);
-              onDeleted();
-            }
+            void (async () => {
+              const ok = await confirmAsync({
+                title: t('orders.deleteOrder'),
+                message: t('orders.deleteOrderConfirm'),
+                confirmLabel: t('common.delete'),
+                cancelLabel: t('common.cancel'),
+              });
+              if (ok) {
+                removeOrder(order.id);
+                onDeleted();
+              }
+            })();
           }}
         >
-          Delete order
+          {t('orders.deleteOrder')}
         </button>
       </div>
-      <p className="muted">Client: {clientName}</p>
+      <p className="muted">
+        {t('orders.clientLabel')} {clientName}
+      </p>
 
       <form className="form-grid tight" onSubmit={saveMeta}>
         <label>
-          Name
+          {t('common.name')}
           <input value={title} onChange={(e) => setTitle(e.target.value)} />
         </label>
         <label>
-          Total (₹)
+          {t('orders.labelTotalShort')}
           <input type="number" min="0" value={totalAmount} onChange={(e) => setTotalAmount(e.target.value)} />
         </label>
         <p className="muted small full" style={{ gridColumn: '1 / -1', margin: '0 0 0.25rem' }}>
-          Status:{' '}
+          {t('orders.statusLine')}{' '}
           <strong className={`order-workflow-pill order-workflow-pill--${deriveOrderWorkflowStatus(order, localCalendarTodayISO())}`} style={{ display: 'inline-block', marginLeft: '0.35rem' }}>
             {orderWorkflowLabel(deriveOrderWorkflowStatus(order, localCalendarTodayISO()))}
           </strong>
-          <span className="muted"> — from event dates and amount due.</span>
+          <span className="muted"> {t('orders.statusHint')}</span>
         </p>
         <label>
-          Order date
+          {t('orders.labelOrderDate')}
           <input type="date" lang="en-IN" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
         </label>
         <label>
-          Event from
+          {t('orders.labelEventFrom')}
           <input type="date" lang="en-IN" value={eventDateFrom} onChange={(e) => setEventDateFrom(e.target.value)} />
         </label>
         <label>
-          Event to
+          {t('orders.labelEventTo')}
           <input
             type="date"
             lang="en-IN"
@@ -380,33 +395,37 @@ function OrderDetail({
           />
         </label>
         <p className="muted small full" style={{ gridColumn: '1 / -1', margin: '-0.25rem 0 0' }}>
-          For single-day events, leave &quot;Event to&quot; empty. For weddings across several days, set both.
+          {t('orders.eventToHint')}
         </p>
         <label className="full">
-          Venue / address
+          {t('orders.labelVenue')}
           <textarea
             rows={2}
             value={address}
             onChange={(e) => setAddress(e.target.value)}
-            placeholder="Shoot or delivery address (optional)"
+            placeholder={t('orders.venuePlaceholder')}
           />
         </label>
         <label className="full">
-          Notes
+          {t('common.notes')}
           <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
         </label>
         <div className="form-actions full">
           <button type="submit" className="btn primary">
-            Save details
+            {t('orders.saveDetails')}
           </button>
         </div>
       </form>
 
       <div className="money-strip">
-        <span>Received: {formatINR(received)}</span>
-        <span>Total: {formatINR(total)}</span>
         <span>
-          Due: <strong className={due > 0 ? 'warn' : 'ok'}>{formatINR(Math.max(0, due))}</strong>
+          {t('orders.received')} {formatINR(received)}
+        </span>
+        <span>
+          {t('orders.total')} {formatINR(total)}
+        </span>
+        <span>
+          {t('orders.dueLabel')} <strong className={due > 0 ? 'warn' : 'ok'}>{formatINR(Math.max(0, due))}</strong>
         </span>
       </div>
 
@@ -419,20 +438,20 @@ function OrderDetail({
       />
 
       <section className="subblock">
-        <h4>Client payments / installments</h4>
+        <h4>{t('orders.paymentsTitle')}</h4>
         <form className="form-row" onSubmit={addPay}>
           <input
             type="number"
             min="0"
-            placeholder="Amount (₹)"
+            placeholder={t('orders.amountPlaceholder')}
             value={payAmount}
             onChange={(e) => setPayAmount(e.target.value)}
             required
           />
           <input type="date" lang="en-IN" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
-          <input placeholder="Note" value={payNote} onChange={(e) => setPayNote(e.target.value)} />
+          <input placeholder={t('orders.payNote')} value={payNote} onChange={(e) => setPayNote(e.target.value)} />
           <button type="submit" className="btn primary">
-            Add
+            {t('common.add')}
           </button>
         </form>
         <ul className="mini-table">
@@ -444,7 +463,20 @@ function OrderDetail({
               <button
                 type="button"
                 className="btn tiny danger"
-                onClick={() => removeClientPayment(order.id, p.id)}
+                onClick={() => {
+                  void (async () => {
+                    const ok = await confirmAsync({
+                      title: t('orders.confirmRemovePaymentTitle'),
+                      message: t('orders.removePaymentConfirm', {
+                        amount: formatINR(p.amount),
+                        date: formatISODateDisplay(p.date),
+                      }),
+                      confirmLabel: t('common.remove'),
+                      cancelLabel: t('common.cancel'),
+                    });
+                    if (ok) removeClientPayment(order.id, p.id);
+                  })();
+                }}
               >
                 ×
               </button>
@@ -463,6 +495,8 @@ function ExposureGuestsSection({
   updateExposureGuest,
   removeExposureGuest,
 }) {
+  const { t } = useTranslation();
+  const { confirmAsync } = useConfirm();
   const list = guests || [];
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -525,24 +559,21 @@ function ExposureGuestsSection({
 
   return (
     <section className="subblock exposure-guests-block">
-      <h4>Who is coming to your studio for this Order</h4>
+      <h4>{t('orders.exposureTitle')}</h4>
       <p className="muted small" style={{ margin: '0 0 0.65rem' }}>
-        Add everyone who will be at <strong>your place</strong> for this job. When <em>you</em> go to someone
-        else&apos;s location, use the <strong>My Exposing</strong> tab instead. If you owe them money for the
-        exposure, enter it under <strong>Pay them</strong>. Use the same <strong>Match key</strong> on My Exposing
-        (or the same spelling) so the dashboard can net what you collect minus what you pay.
+        {t('orders.exposureIntro')}
       </p>
       <form className="form-grid tight" onSubmit={submitGuest}>
         <label>
-          Name *
+          {t('orders.labelNameReq')}
           <input value={name} onChange={(e) => setName(e.target.value)} required />
         </label>
         <label>
-          Phone
+          {t('common.phone')}
           <input value={phone} onChange={(e) => setPhone(e.target.value)} />
         </label>
         <label>
-          Pay them (₹)
+          {t('orders.payThem')}
           <input
             type="number"
             min="0"
@@ -552,31 +583,35 @@ function ExposureGuestsSection({
           />
         </label>
         <label>
-          Match key
+          {t('orders.matchKey')}
           <input
-            placeholder="e.g. sandip — same on My Exposing"
+            placeholder={t('orders.matchKeyPlaceholder')}
             value={gPartyKey}
             onChange={(e) => setGPartyKey(e.target.value)}
           />
         </label>
         <label className="full">
-          Note (role, day, etc.)
-          <input value={gnotes} onChange={(e) => setGnotes(e.target.value)} />
+          {t('orders.guestNoteLabel')}
+          <input
+            placeholder={t('orders.guestNotePlaceholder')}
+            value={gnotes}
+            onChange={(e) => setGnotes(e.target.value)}
+          />
         </label>
         <div className="form-actions full">
-          <button type="submit" className="btn primary">
-            {editingId ? 'Save' : 'Add'}
-          </button>
           {editingId ? (
             <button type="button" className="btn" onClick={cancelEdit}>
-              Cancel
+              {t('common.cancel')}
             </button>
           ) : null}
+          <button type="submit" className="btn primary">
+            {editingId ? t('common.save') : t('common.add')}
+          </button>
         </div>
       </form>
       {list.length === 0 ? (
         <p className="muted small" style={{ margin: '0.65rem 0 0' }}>
-          No one listed yet.
+          {t('orders.noGuests')}
         </p>
       ) : (
         <ul className="exposure-guest-list">
@@ -586,23 +621,37 @@ function ExposureGuestsSection({
                 <strong>{g.name}</strong>
                 {g.phone ? <span className="muted"> · {g.phone}</span> : null}
                 {(Number(g.amountToPay) || 0) > 0 ? (
-                  <div className="muted small">You pay: {formatINR(g.amountToPay)}</div>
+                  <div className="muted small">
+                    {t('orders.youPay')} {formatINR(g.amountToPay)}
+                  </div>
                 ) : null}
-                {g.partyKey ? <div className="muted small">Match key: {g.partyKey}</div> : null}
+                {g.partyKey ? (
+                  <div className="muted small">
+                    {t('orders.matchKeyLabel')} {g.partyKey}
+                  </div>
+                ) : null}
                 {g.notes ? <div className="muted small">{g.notes}</div> : null}
               </div>
               <div className="row-actions">
                 <button type="button" className="btn small" onClick={() => startEdit(g)}>
-                  Edit
+                  {t('common.edit')}
                 </button>
                 <button
                   type="button"
                   className="btn small danger"
                   onClick={() => {
-                    if (window.confirm(`Remove ${g.name} from this list?`)) removeExposureGuest(orderId, g.id);
+                    void (async () => {
+                      const ok = await confirmAsync({
+                        title: t('orders.confirmRemoveGuestTitle'),
+                        message: t('orders.removeGuestConfirm', { name: g.name }),
+                        confirmLabel: t('common.remove'),
+                        cancelLabel: t('common.cancel'),
+                      });
+                      if (ok) removeExposureGuest(orderId, g.id);
+                    })();
                   }}
                 >
-                  Remove
+                  {t('common.remove')}
                 </button>
               </div>
             </li>

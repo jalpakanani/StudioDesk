@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useStudio } from '../context/StudioContext';
 import { useTab } from '../context/TabContext';
+import { useConfirm } from '../context/ConfirmContext';
 
 export default function ClientsView() {
+  const { t } = useTranslation();
+  const { confirmAsync } = useConfirm();
   const { clients, addClient, updateClient, removeClient } = useStudio();
   const { setTab, navFocus, clearNavFocus } = useTab();
   const nameRef = useRef(null);
@@ -63,8 +67,8 @@ export default function ClientsView() {
     <div className="panel">
       <div className="panel-head">
         <div>
-          <h2 className="panel-title">Clients</h2>
-          <p className="panel-lead">People you shoot for—used on every order and payment line.</p>
+          <h2 className="panel-title">{t('clients.title')}</h2>
+          <p className="panel-lead">{t('clients.lead')}</p>
         </div>
       </div>
 
@@ -84,25 +88,25 @@ export default function ClientsView() {
           <div className="empty-spotlight-icon" aria-hidden="true">
             👋
           </div>
-          <h3>Add your first client</h3>
-          <p>Tap here or fill the form below—takes a few seconds.</p>
+          <h3>{t('clients.emptyTitle')}</h3>
+          <p>{t('clients.emptyText')}</p>
         </div>
       ) : null}
 
       <div className="glass-panel">
-        <h3 className="glass-panel-title">Quick add</h3>
+        <h3 className="glass-panel-title">{t('clients.quickAdd')}</h3>
         <form className="form-row" onSubmit={submitNew}>
           <input
             ref={nameRef}
-            placeholder="Name *"
+            placeholder={t('clients.placeholderName')}
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
           />
-          <input placeholder="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-          <input placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <input placeholder={t('clients.placeholderPhone')} value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <input placeholder={t('clients.placeholderNotes')} value={notes} onChange={(e) => setNotes(e.target.value)} />
           <button type="submit" className="btn primary shine">
-            Add client
+            {t('clients.addClient')}
           </button>
         </form>
       </div>
@@ -111,9 +115,9 @@ export default function ClientsView() {
         <section className="glass-panel clients-roster-panel">
           <div className="clients-roster-head">
             <div>
-              <h3 className="glass-panel-title clients-roster-title">Saved clients</h3>
+              <h3 className="glass-panel-title clients-roster-title">{t('clients.savedTitle')}</h3>
               <p className="clients-roster-lead muted small">
-                {clients.length} on file — used when you book orders and log payments.
+                {t('clients.rosterLead', { count: clients.length })}
               </p>
             </div>
             <button
@@ -121,7 +125,7 @@ export default function ClientsView() {
               className="btn primary btn-sm shine clients-roster-cta"
               onClick={() => setTab('orders')}
             >
-              New order
+              {t('clients.newOrder')}
             </button>
           </div>
           <ul className="table-list clients-roster-list">
@@ -133,10 +137,10 @@ export default function ClientsView() {
                     <input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
                     <input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
                     <button type="submit" className="btn small primary">
-                      Save
+                      {t('common.save')}
                     </button>
                     <button type="button" className="btn small" onClick={() => setEditingId(null)}>
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                   </form>
                 ) : (
@@ -148,21 +152,24 @@ export default function ClientsView() {
                     </div>
                     <div className="row-actions">
                       <button type="button" className="btn small" onClick={() => startEdit(c)}>
-                        Edit
+                        {t('common.edit')}
                       </button>
                       <button
                         type="button"
                         className="btn small danger"
                         onClick={() => {
-                          if (
-                            window.confirm(
-                              `Delete ${c.name}? All orders linked to this client will be removed.`
-                            )
-                          )
-                            removeClient(c.id);
+                          void (async () => {
+                            const ok = await confirmAsync({
+                              title: t('clients.confirmDeleteTitle'),
+                              message: t('clients.deleteConfirm', { name: c.name }),
+                              confirmLabel: t('common.delete'),
+                              cancelLabel: t('common.cancel'),
+                            });
+                            if (ok) removeClient(c.id);
+                          })();
                         }}
                       >
-                        Delete
+                        {t('common.delete')}
                       </button>
                     </div>
                   </div>
@@ -173,7 +180,7 @@ export default function ClientsView() {
         </section>
       ) : (
         <ul className="table-list">
-          <li className="muted">Your roster will show up here.</li>
+          <li className="muted">{t('clients.rosterPlaceholder')}</li>
         </ul>
       )}
     </div>

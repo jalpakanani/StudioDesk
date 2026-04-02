@@ -19,6 +19,115 @@
   color: var(--muted);
 }
 
+.app-action-busy {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.app-action-busy__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1.25rem 1.5rem;
+  border-radius: var(--radius);
+  background: var(--surface-solid);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-md);
+  max-width: min(100%, 280px);
+  text-align: center;
+}
+
+.app-action-busy__spinner {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  animation: app-action-busy-spin 0.72s linear infinite;
+}
+
+.app-action-busy__inner p {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+@keyframes app-action-busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ——— In-app confirm (replaces window.confirm) ——— */
+.confirm-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-sizing: border-box;
+}
+
+.confirm-dialog {
+  width: 100%;
+  max-width: 400px;
+  padding: 1.25rem 1.35rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface-solid);
+  box-shadow: var(--shadow-md);
+  box-sizing: border-box;
+}
+
+.confirm-dialog__title {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+}
+
+.confirm-dialog__message {
+  margin: 0 0 1.15rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
+.confirm-dialog__confirm--danger {
+  background: linear-gradient(135deg, #b43c3c, #9a2e2e) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: 0 4px 14px rgba(180, 60, 60, 0.28);
+}
+
+.confirm-dialog__confirm--danger:hover {
+  filter: brightness(1.05);
+}
+
 .app-bg {
   position: fixed;
   left: 0;
@@ -1458,11 +1567,24 @@ html[data-theme='dark'] .stat-tile-owes-clients {
 
 .form-actions {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+  justify-content: flex-end;
 }
 
 .form-actions.full {
   grid-column: 1 / -1;
+}
+
+/* Lighter shadow in action rows so the primary button does not bleed onto the secondary. */
+.form-actions .btn.primary {
+  box-shadow: 0 2px 12px rgba(91, 74, 232, 0.22);
+}
+
+.form-actions .btn.primary:hover {
+  box-shadow: 0 4px 16px rgba(91, 74, 232, 0.3);
 }
 
 .filter-row label {

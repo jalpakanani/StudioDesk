@@ -1,9 +1,11 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import {useTranslation} from 'react-i18next'
 import {useStudio} from '../context/StudioContext'
 import {useTab} from '../context/TabContext'
 import {buildDeskSearchResults} from '../utils/deskSearch'
 
 export default function GlobalSearch() {
+  const {t} = useTranslation()
   const {clients, orders, fieldVisits, clientById} = useStudio()
   const {setTab, setNavFocus} = useTab()
   const [query, setQuery] = useState('')
@@ -13,8 +15,14 @@ export default function GlobalSearch() {
 
   const results = useMemo(
     () =>
-      buildDeskSearchResults(query, {clients, orders, fieldVisits, clientById}),
-    [query, clients, orders, fieldVisits, clientById],
+      buildDeskSearchResults(query, {clients, orders, fieldVisits, clientById}, {
+        client: t('search.fallbackClient'),
+        order: t('search.fallbackOrder'),
+        visitVenue: t('search.fallbackVisit'),
+        visitTitle: t('search.fallbackVisitTitle'),
+        emDash: t('common.dash'),
+      }),
+    [query, clients, orders, fieldVisits, clientById, t],
   )
 
   const grouped = useMemo(() => {
@@ -96,8 +104,8 @@ export default function GlobalSearch() {
           type="search"
           autoComplete="off"
           spellCheck={false}
-          placeholder="Search clients, orders, visits…"
-          aria-label="Search desk"
+          placeholder={t('search.placeholder')}
+          aria-label={t('search.ariaField')}
           value={query}
           onChange={e => setQuery(e.target.value)}
           onFocus={() => setPanelOpen(true)}
@@ -117,23 +125,23 @@ export default function GlobalSearch() {
           id="desk-search-results"
           className="global-search-panel"
           role="region"
-          aria-label="Search results"
+          aria-label={t('search.results')}
         >
           {!hasQuery ? (
             <p className="global-search-panel-hint muted small">
-              Type to filter. Shortcut{' '}
+              {t('search.hint')}{' '}
               <kbd className="global-search-kbd global-search-kbd--inline">
                 {isMac ? '⌘' : 'Ctrl'}K
               </kbd>{' '}
-              focuses this field.
+              {t('search.focusesField')}
             </p>
           ) : results.length === 0 ? (
-            <p className="global-search-empty muted small">No matches.</p>
+            <p className="global-search-empty muted small">{t('search.noMatches')}</p>
           ) : (
             <div className="global-search-groups">
               {grouped.client.length > 0 ? (
-                <section className="global-search-group" aria-label="Clients">
-                  <h4 className="global-search-group-title">Clients</h4>
+                <section className="global-search-group" aria-label={t('search.groupClients')}>
+                  <h4 className="global-search-group-title">{t('search.groupClients')}</h4>
                   <ul className="global-search-list">
                     {grouped.client.map(r => (
                       <li key={`c-${r.id}`}>
@@ -156,8 +164,8 @@ export default function GlobalSearch() {
                 </section>
               ) : null}
               {grouped.order.length > 0 ? (
-                <section className="global-search-group" aria-label="Orders">
-                  <h4 className="global-search-group-title">Orders</h4>
+                <section className="global-search-group" aria-label={t('search.groupOrders')}>
+                  <h4 className="global-search-group-title">{t('search.groupOrders')}</h4>
                   <ul className="global-search-list">
                     {grouped.order.map(r => (
                       <li key={`o-${r.id}`}>
@@ -182,9 +190,9 @@ export default function GlobalSearch() {
               {grouped.visit.length > 0 ? (
                 <section
                   className="global-search-group"
-                  aria-label="My Exposing"
+                  aria-label={t('search.groupVisits')}
                 >
-                  <h4 className="global-search-group-title">My Exposing</h4>
+                  <h4 className="global-search-group-title">{t('search.groupVisits')}</h4>
                   <ul className="global-search-list">
                     {grouped.visit.map(r => (
                       <li key={`v-${r.id}`}>

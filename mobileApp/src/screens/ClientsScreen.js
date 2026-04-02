@@ -1,20 +1,16 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import {
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { FlatList, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStudio } from '../context/StudioContext';
+import { useConfirm } from '../context/ConfirmContext';
 import OpenDeskSearchButton from '../components/OpenDeskSearchButton';
 import { colors, radius } from '../theme';
 
 export default function ClientsScreen() {
+  const { t } = useTranslation();
+  const { confirmAsync } = useConfirm();
   const route = useRoute();
   const navigation = useNavigation();
   const listRef = useRef(null);
@@ -139,7 +135,17 @@ export default function ClientsScreen() {
               <Text style={styles.smallBtnText}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              onPress={() => removeClient(c.id)}
+              onPress={() => {
+                void (async () => {
+                  const ok = await confirmAsync({
+                    title: t('deleteClientTitle'),
+                    message: t('deleteClientMessage', { name: c.name }),
+                    confirmLabel: t('dialogDelete'),
+                    cancelLabel: t('dialogCancel'),
+                  });
+                  if (ok) removeClient(c.id);
+                })();
+              }}
               style={[styles.smallBtn, styles.dangerBtn]}
             >
               <Text style={styles.smallBtnText}>Del</Text>

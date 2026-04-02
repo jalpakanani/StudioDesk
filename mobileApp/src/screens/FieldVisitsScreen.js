@@ -9,9 +9,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { useStudio } from '../context/StudioContext';
+import { useConfirm } from '../context/ConfirmContext';
 import DatePickerField from '../components/DatePickerField';
 import OpenDeskSearchButton from '../components/OpenDeskSearchButton';
 import { fieldVisitRange, formatDateRangeEn, formatISODateDisplay, toISODateOr } from '../utils/dateRange';
@@ -32,6 +34,7 @@ function oneVisitCard(v) {
 }
 
 export default function FieldVisitsScreen() {
+  const { t } = useTranslation();
   const route = useRoute();
   const navigation = useNavigation();
   const {
@@ -236,6 +239,7 @@ export default function FieldVisitsScreen() {
                   removeFieldVisit(detail.id);
                   setDetail(null);
                 }}
+                t={t}
               />
             ) : null}
           </ScrollView>
@@ -264,7 +268,7 @@ function AddVisitForm({ onClose, onCreate }) {
         style={styles.input}
         value={hostName}
         onChangeText={setHostName}
-        placeholder="e.g. Rahul, Meera aunty, XYZ studio"
+        placeholder="e.g. XYZ studio"
         placeholderTextColor={colors.muted}
       />
       <Text style={styles.label}>Venue or address</Text>
@@ -353,7 +357,17 @@ function AddVisitForm({ onClose, onCreate }) {
   );
 }
 
-function VisitDetail({ visit, card, onClose, onAddCollection, onRemoveCollection, onUpdatePartyKey, onDelete }) {
+function VisitDetail({
+  visit,
+  card,
+  onClose,
+  onAddCollection,
+  onRemoveCollection,
+  onUpdatePartyKey,
+  onDelete,
+  t,
+}) {
+  const { confirmAsync } = useConfirm();
   const [amt, setAmt] = useState('');
   const [note, setNote] = useState('');
   const [partyKey, setPartyKey] = useState(visit.partyKey || '');
@@ -412,7 +426,22 @@ function VisitDetail({ visit, card, onClose, onAddCollection, onRemoveCollection
             {formatINR(p.amount)} · {formatISODateDisplay(p.date)}
             {p.note ? ` · ${p.note}` : ''}
           </Text>
-          <TouchableOpacity onPress={() => onRemoveCollection(p.id)}>
+          <TouchableOpacity
+            onPress={() => {
+              void (async () => {
+                const ok = await confirmAsync({
+                  title: t('removeCollectionTitle'),
+                  message: t('removeCollectionMessage', {
+                    amount: formatINR(p.amount),
+                    date: formatISODateDisplay(p.date),
+                  }),
+                  confirmLabel: t('dialogRemove'),
+                  cancelLabel: t('dialogCancel'),
+                });
+                if (ok) onRemoveCollection(p.id);
+              })();
+            }}
+          >
             <Text style={styles.del}>Remove</Text>
           </TouchableOpacity>
         </View>
@@ -445,7 +474,20 @@ function VisitDetail({ visit, card, onClose, onAddCollection, onRemoveCollection
         <Text style={styles.btnText}>Add collection</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.btnPrimary, styles.dangerBtn2]} onPress={onDelete}>
+      <TouchableOpacity
+        style={[styles.btnPrimary, styles.dangerBtn2]}
+        onPress={() => {
+          void (async () => {
+            const ok = await confirmAsync({
+              title: t('deleteVisitTitle'),
+              message: t('deleteVisitMessage', { name: visit.hostName }),
+              confirmLabel: t('dialogDelete'),
+              cancelLabel: t('dialogCancel'),
+            });
+            if (ok) onDelete();
+          })();
+        }}
+      >
         <Text style={styles.btnText}>Delete visit</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.btnGhost} onPress={onClose}>

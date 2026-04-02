@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { StudioProvider, useStudio } from './context/StudioContext';
 import { TabProvider, useTab } from './context/TabContext';
+import { ConfirmProvider } from './context/ConfirmContext';
 import { useReminderNotifications } from './hooks/useReminderNotifications';
 import './App.css';
 import Dashboard from './components/Dashboard';
@@ -11,14 +14,7 @@ import SettingsView from './components/SettingsView';
 import BackupBar from './components/BackupBar';
 import GlobalSearch from './components/GlobalSearch';
 import LoginScreen from './components/LoginScreen';
-
-const TABS = [
-  { id: 'dash', label: 'Dashboard', icon: '◇' },
-  { id: 'clients', label: 'Clients', icon: '◎' },
-  { id: 'orders', label: 'Orders', icon: '▤' },
-  { id: 'field', label: 'My Exposing', icon: '⌖' },
-  { id: 'settings', label: 'Settings', icon: '⚙' },
-];
+import { useStudioDisplayName } from './hooks/useStudioDisplayName';
 
 function ReminderRunner() {
   const { orders, fieldVisits, clientById } = useStudio();
@@ -27,16 +23,29 @@ function ReminderRunner() {
 }
 
 function Shell() {
+  const { t } = useTranslation();
+  const studioName = useStudioDisplayName();
   const { tab, setTab } = useTab();
   const auth = useAuth();
-  const { studioReady } = useStudio();
+  const { studioReady, actionBusy } = useStudio();
+
+  const tabs = useMemo(
+    () => [
+      { id: 'dash', label: t('tabs.dash'), icon: '◇' },
+      { id: 'clients', label: t('tabs.clients'), icon: '◎' },
+      { id: 'orders', label: t('tabs.orders'), icon: '▤' },
+      { id: 'field', label: t('tabs.field'), icon: '⌖' },
+      { id: 'settings', label: t('tabs.settings'), icon: '⚙' },
+    ],
+    [t],
+  );
 
   if (auth.firebaseEnabled && auth.user && !studioReady) {
     return (
       <div className="app-shell">
         <div className="app-bg" aria-hidden="true" />
         <div className="app-loading">
-          <p>Syncing your desk…</p>
+          <p>{t('app.syncing')}</p>
         </div>
       </div>
     );
@@ -67,8 +76,8 @@ function Shell() {
                 </svg>
               </span>
               <div>
-                <h1>My Studio Desk</h1>
-                <p className="tagline">Orders &amp; payments · My Exposing &amp; collections</p>
+                <h1>{studioName || t('app.brand')}</h1>
+                <p className="tagline">{t('app.tagline')}</p>
               </div>
             </div>
             <div className="header-tools">
@@ -80,23 +89,23 @@ function Shell() {
                   {auth.user.email}
                 </span>
                 <button type="button" className="btn small" onClick={() => auth.logOut()}>
-                  Sign out
+                  {t('app.signOut')}
                 </button>
               </div>
             ) : null}
           </div>
-          <nav className="tabs" aria-label="Main navigation">
-            {TABS.map((t) => (
+          <nav className="tabs" aria-label={t('app.navMain')}>
+            {tabs.map((item) => (
               <button
-                key={t.id}
+                key={item.id}
                 type="button"
-                className={`tab ${tab === t.id ? 'active' : ''}`}
-                onClick={() => setTab(t.id)}
+                className={`tab ${tab === item.id ? 'active' : ''}`}
+                onClick={() => setTab(item.id)}
               >
                 <span className="tab-icon" aria-hidden="true">
-                  {t.icon}
+                  {item.icon}
                 </span>
-                <span>{t.label}</span>
+                <span>{item.label}</span>
               </button>
             ))}
           </nav>
@@ -114,11 +123,26 @@ function Shell() {
       </main>
 
       <BackupBar />
+
+      {actionBusy ? (
+        <div
+          className="app-action-busy"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div className="app-action-busy__inner">
+            <div className="app-action-busy__spinner" aria-hidden="true" />
+            <p>{t('app.saving')}</p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function AppGate() {
+  const { t } = useTranslation();
   const auth = useAuth();
 
   if (auth.firebaseEnabled && auth.loading) {
@@ -126,7 +150,7 @@ function AppGate() {
       <div className="app-shell">
         <div className="app-bg" aria-hidden="true" />
         <div className="app-loading">
-          <p>Loading…</p>
+          <p>{t('app.loading')}</p>
         </div>
       </div>
     );
@@ -145,7 +169,9 @@ function AppGate() {
     return (
       <StudioProvider useCloud={false} syncUserId={null}>
         <TabProvider>
-          <Shell />
+          <ConfirmProvider>
+            <Shell />
+          </ConfirmProvider>
         </TabProvider>
       </StudioProvider>
     );
@@ -154,7 +180,9 @@ function AppGate() {
   return (
     <StudioProvider useCloud syncUserId={auth.user.uid}>
       <TabProvider>
-        <Shell />
+        <ConfirmProvider>
+          <Shell />
+        </ConfirmProvider>
       </TabProvider>
     </StudioProvider>
   );

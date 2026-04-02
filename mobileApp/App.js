@@ -1,14 +1,19 @@
 import './src/firebase/init';
+import './src/i18n';
+import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Platform, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { StudioProvider, useStudio } from './src/context/StudioContext';
+import { ConfirmProvider } from './src/context/ConfirmContext';
 import { isFirebaseConfigured } from './src/firebase/init';
 import LoginScreen from './src/screens/LoginScreen';
 import RootStack from './src/navigation/RootStack';
 import { useReminderNotificationsMobile } from './src/hooks/useReminderNotificationsMobile';
 import { colors } from './src/theme';
+import { loadSavedLanguage } from './src/i18n';
 
 function ReminderNotificationsBridge() {
   const { orders, fieldVisits, clientById } = useStudio();
@@ -46,7 +51,8 @@ function ConfigMissing() {
 }
 
 function SyncGate({ children }) {
-  const { studioReady, syncError } = useStudio();
+  const { t } = useTranslation();
+  const { studioReady, syncError, actionBusy } = useStudio();
   if (!studioReady) {
     return (
       <SafeAreaView style={styles.center} edges={['top', 'bottom', 'left', 'right']}>
@@ -63,7 +69,15 @@ function SyncGate({ children }) {
         </View>
       ) : null}
       <ReminderNotificationsBridge />
-      {children}
+      <ConfirmProvider>{children}</ConfirmProvider>
+      {actionBusy ? (
+        <View style={styles.actionBusyOverlay} pointerEvents="auto">
+          <View style={styles.actionBusyCard}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.actionBusyText}>{t('saving')}</Text>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -97,6 +111,10 @@ function Root() {
 }
 
 export default function App() {
+  useEffect(() => {
+    loadSavedLanguage();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
@@ -130,4 +148,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   syncBannerText: { color: colors.syncErrorText, fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  actionBusyOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.52)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    zIndex: 100,
+  },
+  actionBusyCard: {
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 22,
+    paddingHorizontal: 28,
+    borderRadius: 16,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxWidth: 280,
+    width: '100%',
+  },
+  actionBusyText: { fontSize: 15, fontWeight: '600', color: colors.muted, textAlign: 'center' },
 });

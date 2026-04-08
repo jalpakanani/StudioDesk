@@ -4,9 +4,26 @@ import { useStudio } from '../context/StudioContext';
 import { useTab } from '../context/TabContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { formatINR, sumPayments } from '../utils/money';
-import { formatDateRangeEn, formatISODateDisplay, orderEventRange } from '../utils/dateRange';
+import {
+  coerceDateFieldToISO,
+  formatDateRangeEn,
+  formatISODateDisplay,
+  orderEventRange,
+} from '../utils/dateRange';
 import { deriveOrderWorkflowStatus, orderWorkflowLabel } from '../utils/orderWorkflow';
 import { localCalendarTodayISO } from '../utils/reminders';
+
+function digitsForTel(phone) {
+  const d = String(phone || '').replace(/\D/g, '');
+  return d.length ? d : '';
+}
+
+function orderSortKey(o) {
+  const { from, to } = orderEventRange(o);
+  const end = to || from;
+  const od = coerceDateFieldToISO(o.orderDate);
+  return end || od || '9999-12-31';
+}
 
 export default function OrdersView() {
   const { t } = useTranslation();
@@ -34,8 +51,29 @@ export default function OrdersView() {
   const [newEventFrom, setNewEventFrom] = useState('');
   const [newEventTo, setNewEventTo] = useState('');
   const [newAddress, setNewAddress] = useState('');
+  const [jobsQuery, setJobsQuery] = useState('');
 
   const selected = useMemo(() => orders.find((o) => o.id === selectedId) || null, [orders, selectedId]);
+
+  const filteredOrders = useMemo(() => {
+    const q = jobsQuery.trim().toLowerCase();
+    const base = q
+      ? orders.filter((o) => {
+          const name = (clientById.get(o.clientId)?.name || '').toLowerCase();
+          const title = (o.title || '').toLowerCase();
+          const addr = (o.address || '').toLowerCase();
+          return name.includes(q) || title.includes(q) || addr.includes(q);
+        })
+      : orders;
+    return [...base].sort((a, b) => orderSortKey(a).localeCompare(orderSortKey(b)));
+  }, [orders, jobsQuery, clientById]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    if (!filteredOrders.some((o) => o.id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [filteredOrders, selectedId]);
   const deskToday = localCalendarTodayISO();
 
   useEffect(() => {
@@ -52,6 +90,9 @@ export default function OrdersView() {
       el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       el?.classList.add('desk-flash');
       window.setTimeout(() => el?.classList.remove('desk-flash'), 2000);
+      if (typeof window !== 'undefined' && window.matchMedia('(max-width: 839px)').matches) {
+        document.querySelector('.detail-pane')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     });
   }, [navFocus, orders, clearNavFocus]);
 
@@ -79,6 +120,15 @@ export default function OrdersView() {
   function focusNewOrder() {
     titleRef.current?.focus();
     titleRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function selectOrder(id) {
+    setSelectedId(id);
+    requestAnimationFrame(() => {
+      if (typeof window !== 'undefined' && window.matchMedia('(max-width: 839px)').matches) {
+        document.querySelector('.detail-pane')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
   }
 
   return (
@@ -173,10 +223,23 @@ export default function OrdersView() {
         </form>
       </div>
 
-      <div className="split">
-        <div>
-          <h3 className="subhead">{t('orders.yourJobs')}</h3>
-          <ul className="order-pick">
+      <div className="split split--orders">
+        <div className="order-pick-column">
+          <h3 className="subhead order-pick-subhead">{t('orders.yourJobs')}</h3>
+          {orders.length > 0 ? (
+            <input
+              type="search"
+              className="order-pick-search"
+              value={jobsQuery}
+              onChange={(e) => setJobsQuery(e.target.value)}
+              placeholder={t('orders.filterJobsPlaceholder')}
+              aria-label={t('orders.filterJobs')}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          ) : null}
+          <div className="order-pick-scroll">
+            <ul className="order-pick">
             {orders.length === 0 && clients.length > 0 ? (
               <li>
                 <button type="button" className="empty-spotlight" onClick={focusNewOrder}>
@@ -191,51 +254,96 @@ export default function OrdersView() {
             {orders.length === 0 && !clients.length ? (
               <li className="muted">{t('orders.needClient')}</li>
             ) : null}
-            {orders.map((o) => {
+            {orders.length > 0 && filteredOrders.length === 0 ? (
+              <li className="muted order-pick-filter-empty">{t('orders.filterJobsEmpty')}</li>
+            ) : null}
+            {filteredOrders.map((o) => {
               const rec = sumPayments(o.clientPayments);
               const total = Number(o.totalAmount) || 0;
               const due = total - rec;
               const ev = orderEventRange(o);
               const evLabel = ev.from ? formatDateRangeEn(ev.from, ev.to) : null;
               const guestCount = (o.exposureGuests || []).length;
+              const client = clientById.get(o.clientId);
+              const clientName = client?.name || '—';
+              const telDigits = digitsForTel(client?.phone);
+              const wf = deriveOrderWorkflowStatus(o, deskToday);
               return (
-                <li key={o.id}>
-                  <button
-                    id={`order-pick-${o.id}`}
-                    type="button"
-                    className={`pick ${selectedId === o.id ? 'active' : ''}`}
-                    onClick={() => setSelectedId(o.id)}
+                <li key={o.id} className="order-pick-item">
+                  <div
+                    className={`order-pick-card ${selectedId === o.id ? 'order-pick-card--active' : ''}`}
                   >
-                    <div className="pick-title-row">
-                      <div className="pick-title">{o.title}</div>
-                      <span
-                        className={`order-workflow-pill order-workflow-pill--${deriveOrderWorkflowStatus(o, deskToday)}`}
+                    <button
+                      id={`order-pick-${o.id}`}
+                      type="button"
+                      className="order-pick-main"
+                      onClick={() => selectOrder(o.id)}
+                    >
+                      <div className="pick-title-row">
+                        <div className="pick-title">{o.title}</div>
+                        <span className={`order-workflow-pill order-workflow-pill--${wf}`}>
+                          {orderWorkflowLabel(wf)}
+                        </span>
+                      </div>
+                      <div className="order-pick-row">
+                        <span className="order-pick-row__icon" aria-hidden="true">
+                          👤
+                        </span>
+                        <span className="order-pick-row__text">
+                          <span className="order-pick-row__client">{clientName}</span>
+                          <span className="order-pick-row__muted"> · {t('orders.due')} </span>
+                          <span className={due > 0 ? 'warn' : 'ok'}>{formatINR(Math.max(0, due))}</span>
+                        </span>
+                      </div>
+                      {evLabel ? (
+                        <div className="order-pick-row">
+                          <span className="order-pick-row__icon" aria-hidden="true">
+                            📅
+                          </span>
+                          <span className="order-pick-row__text">
+                            <span className="order-pick-row__muted">{t('orders.event')} </span>
+                            <span className="order-pick-row__em">{evLabel}</span>
+                          </span>
+                        </div>
+                      ) : null}
+                      {o.address ? (
+                        <div className="muted small" style={{ marginTop: 6 }}>
+                          {o.address.length > 72 ? `${o.address.slice(0, 72)}…` : o.address}
+                        </div>
+                      ) : null}
+                      {guestCount > 0 ? (
+                        <div className="pick-guest-hint">{t('orders.guestsHint', { count: guestCount })}</div>
+                      ) : null}
+                    </button>
+                    <div className="order-pick-actions">
+                      <button
+                        type="button"
+                        className="btn btn-sm primary"
+                        onClick={() => selectOrder(o.id)}
                       >
-                        {orderWorkflowLabel(deriveOrderWorkflowStatus(o, deskToday))}
-                      </span>
+                        {t('orders.cardOpen')}
+                      </button>
+                      {due > 0 ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          onClick={() => selectOrder(o.id)}
+                        >
+                          {t('orders.cardRecordPay')}
+                        </button>
+                      ) : null}
+                      {telDigits ? (
+                        <a className="btn btn-sm order-pick-call" href={`tel:${telDigits}`}>
+                          {t('orders.cardCall')}
+                        </a>
+                      ) : null}
                     </div>
-                    <div className="muted small">
-                      {clientById.get(o.clientId)?.name} · {t('orders.due')}{' '}
-                      <span className={due > 0 ? 'warn' : 'ok'}>{formatINR(Math.max(0, due))}</span>
-                    </div>
-                    {evLabel ? (
-                      <div className="muted small">
-                        {t('orders.event')} {evLabel}
-                      </div>
-                    ) : null}
-                    {o.address ? (
-                      <div className="muted small" style={{ marginTop: 2 }}>
-                        {o.address.length > 72 ? `${o.address.slice(0, 72)}…` : o.address}
-                      </div>
-                    ) : null}
-                    {guestCount > 0 ? (
-                      <div className="pick-guest-hint">{t('orders.guestsHint', { count: guestCount })}</div>
-                    ) : null}
-                  </button>
+                  </div>
                 </li>
               );
             })}
-          </ul>
+            </ul>
+          </div>
         </div>
 
         <div className="detail-pane">
@@ -302,6 +410,16 @@ function OrderDetail({
   const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [payNote, setPayNote] = useState('');
+  const [managingPayments, setManagingPayments] = useState(false);
+
+  useEffect(() => {
+    setManagingPayments(false);
+  }, [order.id]);
+
+  const paymentCount = (order.clientPayments || []).length;
+  useEffect(() => {
+    if (paymentCount === 0) setManagingPayments(false);
+  }, [paymentCount]);
 
   const received = sumPayments(order.clientPayments);
   const total = Number(order.totalAmount) || 0;
@@ -438,7 +556,18 @@ function OrderDetail({
       />
 
       <section className="subblock">
-        <h4>{t('orders.paymentsTitle')}</h4>
+        <div className="subblock-head">
+          <h4>{t('orders.paymentsTitle')}</h4>
+          {paymentCount > 0 ? (
+            <button
+              type="button"
+              className="btn-link payments-manage-toggle"
+              onClick={() => setManagingPayments((v) => !v)}
+            >
+              {managingPayments ? t('orders.doneManagePayments') : t('orders.managePayments')}
+            </button>
+          ) : null}
+        </div>
         <form className="form-row" onSubmit={addPay}>
           <input
             type="number"
@@ -454,32 +583,38 @@ function OrderDetail({
             {t('common.add')}
           </button>
         </form>
-        <ul className="mini-table">
+        <ul
+          className={
+            managingPayments ? 'mini-table' : 'mini-table mini-table--no-actions'
+          }
+        >
           {(order.clientPayments || []).map((p) => (
             <li key={p.id}>
               <span>{formatISODateDisplay(p.date)}</span>
               <span>{formatINR(p.amount)}</span>
               <span className="muted">{p.note}</span>
-              <button
-                type="button"
-                className="btn tiny danger"
-                onClick={() => {
-                  void (async () => {
-                    const ok = await confirmAsync({
-                      title: t('orders.confirmRemovePaymentTitle'),
-                      message: t('orders.removePaymentConfirm', {
-                        amount: formatINR(p.amount),
-                        date: formatISODateDisplay(p.date),
-                      }),
-                      confirmLabel: t('common.remove'),
-                      cancelLabel: t('common.cancel'),
-                    });
-                    if (ok) removeClientPayment(order.id, p.id);
-                  })();
-                }}
-              >
-                ×
-              </button>
+              {managingPayments ? (
+                <button
+                  type="button"
+                  className="btn tiny danger"
+                  onClick={() => {
+                    void (async () => {
+                      const ok = await confirmAsync({
+                        title: t('orders.confirmRemovePaymentTitle'),
+                        message: t('orders.removePaymentConfirm', {
+                          amount: formatINR(p.amount),
+                          date: formatISODateDisplay(p.date),
+                        }),
+                        confirmLabel: t('common.remove'),
+                        cancelLabel: t('common.cancel'),
+                      });
+                      if (ok) removeClientPayment(order.id, p.id);
+                    })();
+                  }}
+                >
+                  {t('common.remove')}
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>

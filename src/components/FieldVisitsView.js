@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 import {useTranslation} from 'react-i18next'
 import {useStudio} from '../context/StudioContext'
 import {useTab} from '../context/TabContext'
@@ -41,6 +41,8 @@ export default function FieldVisitsView() {
   const [ea, setEa] = useState('')
   const [epk, setEpk] = useState('')
   const [en, setEn] = useState('')
+  const [entriesQuery, setEntriesQuery] = useState('')
+  const newHostRef = useRef(null)
 
   const sorted = useMemo(() => {
     return [...(fieldVisits || [])].sort((a, b) => {
@@ -51,6 +53,18 @@ export default function FieldVisitsView() {
       return (a.time || '').localeCompare(b.time || '')
     })
   }, [fieldVisits])
+
+  const filteredSorted = useMemo(() => {
+    const q = entriesQuery.trim().toLowerCase()
+    if (!q) return sorted
+    return sorted.filter(v => {
+      const host = (v.hostName || '').toLowerCase()
+      const venue = (v.venue || '').toLowerCase()
+      const pk = (v.partyKey || '').toLowerCase()
+      const note = (v.notes || '').toLowerCase()
+      return host.includes(q) || venue.includes(q) || pk.includes(q) || note.includes(q)
+    })
+  }, [sorted, entriesQuery])
 
   /** Visit totals per linked person + Orders → Pay them (same rules as dashboard Same-person net). */
   const cardStatsByVisitId = useMemo(
@@ -129,6 +143,16 @@ export default function FieldVisitsView() {
     setEditingId(null)
   }
 
+  function focusAddForm() {
+    document.getElementById('desk-field-add-panel')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+    window.setTimeout(() => {
+      newHostRef.current?.focus()
+    }, 280)
+  }
+
   return (
     <div className="panel">
       <div className="panel-head">
@@ -137,26 +161,19 @@ export default function FieldVisitsView() {
           <p className="panel-lead panel-lead--tight">{t('field.lead')}</p>
           <details className="panel-tip">
             <summary>{t('field.tipSummary')}</summary>
-            <p
-              className="muted small"
-              style={{margin: '0.5rem 0 0', lineHeight: 1.5, maxWidth: '34rem'}}
-            >
-              {t('field.tipBody')}
-            </p>
+            <p className="panel-tip-body muted small">{t('field.tipBody')}</p>
           </details>
         </div>
       </div>
 
-      <div className="glass-panel">
+      <div className="glass-panel" id="desk-field-add-panel">
         <h3 className="glass-panel-title">{t('field.addEntry')}</h3>
-        <form
-          className="form-grid"
-          onSubmit={submitNew}
-          style={{marginBottom: 0}}
-        >
+        <form className="form-grid glass-panel-form" onSubmit={submitNew}>
           <label>
             {t('field.labelHost')}
             <input
+              ref={newHostRef}
+              id="desk-field-add-host"
               placeholder={t('field.hostPlaceholder')}
               value={hostName}
               onChange={e => setHostName(e.target.value)}
@@ -228,36 +245,69 @@ export default function FieldVisitsView() {
             />
           </label>
           <div className="form-actions full">
-            <button type="submit" className="btn primary shine">
+            <button type="submit" className="btn primary">
               {t('common.save')}
             </button>
           </div>
         </form>
       </div>
 
-      <h3 className="subhead" style={{marginTop: '1.25rem'}}>
+      <h3 className="subhead visit-entries-head">
         {t('field.entries', {count: sorted.length})}
       </h3>
 
+      {sorted.length > 0 ? (
+        <div className="visit-entries-search-wrap">
+          <input
+            type="search"
+            className="visit-entries-search"
+            value={entriesQuery}
+            onChange={e => setEntriesQuery(e.target.value)}
+            placeholder={t('field.filterEntriesPlaceholder')}
+            aria-label={t('field.filterEntries')}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {entriesQuery.trim() ? (
+            <button
+              type="button"
+              className="visit-entries-clear"
+              onClick={() => setEntriesQuery('')}
+              aria-label={t('field.clearSearch')}
+            >
+              ×
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
       {sorted.length === 0 ? (
         <div
-          className="empty-detail"
-          style={{
-            border: '1px solid var(--line)',
-            borderRadius: 'var(--radius)',
-            marginTop: '0.5rem',
+          className="empty-detail visit-empty-detail"
+          role="button"
+          tabIndex={0}
+          onClick={focusAddForm}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              focusAddForm()
+            }
           }}
         >
           <div className="empty-detail-visual" aria-hidden="true">
             🚐
           </div>
-          <p className="muted" style={{margin: 0, maxWidth: '320px'}}>
-            {t('field.emptyText')}
-          </p>
+          <p className="muted visit-empty-detail-text">{t('field.emptyText')}</p>
+          <p className="muted small visit-empty-detail-hint">{t('field.emptyJumpHint')}</p>
         </div>
       ) : (
         <ul className="visit-list">
-          {sorted.map(v => {
+          {sorted.length > 0 && filteredSorted.length === 0 ? (
+            <li className="visit-filter-empty muted" key="_empty-filter">
+              {t('field.filterEntriesEmpty')}
+            </li>
+          ) : null}
+          {filteredSorted.map(v => {
             const oneDue = Math.max(
               0,
               (Number(v.amountToCollect) || 0) - sumPayments(v.collections),
@@ -274,8 +324,13 @@ export default function FieldVisitsView() {
             const received = card.received
             const due = card.due
             const {from, to} = fieldVisitRange(v)
+            const statusClass = due > 0 ? 'visit-card--due' : 'visit-card--settled'
             return (
-              <li key={v.id} id={`desk-visit-${v.id}`} className="visit-card">
+              <li
+                key={v.id}
+                id={`desk-visit-${v.id}`}
+                className={`visit-card ${statusClass}`}
+              >
                 {editingId === v.id ? (
                   <form className="form-grid tight" onSubmit={saveEdit}>
                     <label>
@@ -461,6 +516,7 @@ export default function FieldVisitsView() {
                     <VisitCollections
                       visitId={v.id}
                       collections={v.collections}
+                      dueRemaining={due}
                       addFieldVisitCollection={addFieldVisitCollection}
                       removeFieldVisitCollection={removeFieldVisitCollection}
                       confirmAsync={confirmAsync}
@@ -506,6 +562,7 @@ export default function FieldVisitsView() {
 function VisitCollections({
   visitId,
   collections,
+  dueRemaining,
   addFieldVisitCollection,
   removeFieldVisitCollection,
   confirmAsync,
@@ -514,6 +571,18 @@ function VisitCollections({
   const [amt, setAmt] = useState('')
   const [dt, setDt] = useState(() => new Date().toISOString().slice(0, 10))
   const [nt, setNt] = useState('')
+  const [managingReceipts, setManagingReceipts] = useState(false)
+
+  useEffect(() => {
+    setManagingReceipts(false)
+  }, [visitId])
+
+  const n = (collections || []).length
+
+  useEffect(() => {
+    if (n === 0) setManagingReceipts(false)
+  }, [n])
+  const startOpen = dueRemaining > 0 || n > 0
 
   function add(e) {
     e.preventDefault()
@@ -522,65 +591,92 @@ function VisitCollections({
     setNt('')
   }
 
+  let summaryMeta
+  if (n > 0) {
+    summaryMeta = t('field.collectionsCount', {count: n})
+  } else if (dueRemaining > 0) {
+    summaryMeta = t('field.collectionsDueHint')
+  } else {
+    summaryMeta = t('field.collectionsOkHint')
+  }
+
   return (
-    <div className="visit-collections">
-      <strong className="visit-collections-title">
-        {t('field.collectionsTitle')}
-      </strong>
-      <form className="form-row tight" onSubmit={add}>
-        <input
-          type="number"
-          min="0"
-          placeholder={t('field.amountInr')}
-          value={amt}
-          onChange={e => setAmt(e.target.value)}
-          required
-        />
-        <input type="date" lang="en-IN" value={dt} onChange={e => setDt(e.target.value)} />
-        <input
-          placeholder={t('orders.payNote')}
-          value={nt}
-          onChange={e => setNt(e.target.value)}
-        />
-        <button type="submit" className="btn small primary">
-          {t('field.logReceipt')}
-        </button>
-      </form>
-      {(collections || []).length > 0 ? (
-        <ul className="mini-table">
-          {(collections || []).map(p => (
-            <li key={p.id}>
-              <span>{formatISODateDisplay(p.date)}</span>
-              <span>{formatINR(p.amount)}</span>
-              <span className="muted">{p.note}</span>
+    <details className="visit-collections-details" defaultOpen={startOpen}>
+      <summary className="visit-collections-summary">
+        <span className="visit-collections-summary-title">{t('field.collectionsTitle')}</span>
+        <span className="visit-collections-summary-meta muted small">{summaryMeta}</span>
+      </summary>
+      <div className="visit-collections-inner">
+        <form className="form-row tight visit-collections-form" onSubmit={add}>
+          <input
+            type="number"
+            min="0"
+            placeholder={t('field.amountInr')}
+            value={amt}
+            onChange={e => setAmt(e.target.value)}
+            required
+          />
+          <input type="date" lang="en-IN" value={dt} onChange={e => setDt(e.target.value)} />
+          <input
+            placeholder={t('orders.payNote')}
+            value={nt}
+            onChange={e => setNt(e.target.value)}
+          />
+          <button type="submit" className="btn small primary">
+            {t('field.logReceipt')}
+          </button>
+        </form>
+        {n > 0 ? (
+          <>
+            <div className="visit-collections-list-head">
               <button
                 type="button"
-                className="btn tiny danger"
-                onClick={() => {
-                  void (async () => {
-                    const ok = await confirmAsync({
-                      title: t('field.confirmRemoveCollectionTitle'),
-                      message: t('field.removeCollectionConfirm', {
-                        amount: formatINR(p.amount),
-                        date: formatISODateDisplay(p.date),
-                      }),
-                      confirmLabel: t('common.remove'),
-                      cancelLabel: t('common.cancel'),
-                    })
-                    if (ok) removeFieldVisitCollection(visitId, p.id)
-                  })()
-                }}
+                className="btn-link payments-manage-toggle"
+                onClick={() => setManagingReceipts(v => !v)}
               >
-                ×
+                {managingReceipts ? t('field.doneManageReceipts') : t('field.manageReceipts')}
               </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted small" style={{margin: '0.35rem 0 0'}}>
-          {t('field.noPayments')}
-        </p>
-      )}
-    </div>
+            </div>
+            <ul
+              className={
+                managingReceipts ? 'mini-table' : 'mini-table mini-table--no-actions'
+              }
+            >
+              {(collections || []).map(p => (
+                <li key={p.id}>
+                  <span>{formatISODateDisplay(p.date)}</span>
+                  <span>{formatINR(p.amount)}</span>
+                  <span className="muted">{p.note}</span>
+                  {managingReceipts ? (
+                    <button
+                      type="button"
+                      className="btn tiny danger"
+                      onClick={() => {
+                        void (async () => {
+                          const ok = await confirmAsync({
+                            title: t('field.confirmRemoveCollectionTitle'),
+                            message: t('field.removeCollectionConfirm', {
+                              amount: formatINR(p.amount),
+                              date: formatISODateDisplay(p.date),
+                            }),
+                            confirmLabel: t('common.remove'),
+                            cancelLabel: t('common.cancel'),
+                          })
+                          if (ok) removeFieldVisitCollection(visitId, p.id)
+                        })()
+                      }}
+                    >
+                      {t('common.remove')}
+                    </button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="muted small visit-collections-empty">{t('field.noPayments')}</p>
+        )}
+      </div>
+    </details>
   )
 }

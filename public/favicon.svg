@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Studio desk">
+  <rect width="32" height="32" rx="8" fill="#0d9488"/>
+  <path
+    fill="#fff"
+    d="M7 12h18v2H7v-2zm0 4h18v1.5H7V16zm2.5 3h13v5h-2v-3h-9v3h-2v-5z"
+  />
+</svg>
